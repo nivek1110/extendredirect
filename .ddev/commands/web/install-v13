@@ -1,0 +1,6 @@
+#!/bin/bash
+## Description: Build the clickable TYPO3 v13 demo at https://v13.extendredirect.ddev.site/
+## Usage: install-v13 [--fresh]
+## Example: "ddev install-v13" or "ddev install-v13 --fresh"
+
+bash /var/www/html/Build/Scripts/setup-version-instance.sh 13 "$@"

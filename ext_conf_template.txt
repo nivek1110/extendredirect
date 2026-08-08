@@ -1,0 +1,5 @@
+# cat=basic; type=string; label=SAP API Key
+username =
+
+# cat=basic; type=string; label=SAP Secret Key
+password =

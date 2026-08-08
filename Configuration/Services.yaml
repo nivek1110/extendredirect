@@ -1,0 +1,22 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: true
+
+  TWT\TwtRedirect\:
+    resource: '../Classes/*'
+
+  TWT\TwtRedirect\Controller\ManagementController:
+    tags: [ 'backend.controller' ]
+
+  TWT\TwtRedirect\Command\CheckCommand:
+    tags:
+      - name: 'console.command'
+        command: 'twtredirect:checkredirects'
+        schedulable: true
+
+  TWT\TwtRedirect\EventListener\AddFilterEventListener:
+    tags:
+      - name: event.listener
+        identifier: 'twt_redirect/add-filter-event-listener'

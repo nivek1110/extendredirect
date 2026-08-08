@@ -1,0 +1,14 @@
+# Persistent per-version install directories for the side-by-side demos.
+# Named volumes (rather than bind mounts under the repo) keep the multi-GB
+# TYPO3 base-distributions out of the working tree and out of Mutagen sync,
+# while surviving `ddev restart`. Wiped by `ddev delete` or `docker volume rm`.
+services:
+    web:
+        volumes:
+            - "v13-data:/var/www/html/v13"
+            - "v14-data:/var/www/html/v14"
+volumes:
+    v13-data:
+        name: "${DDEV_SITENAME}-v13-data"
+    v14-data:
+        name: "${DDEV_SITENAME}-v14-data"

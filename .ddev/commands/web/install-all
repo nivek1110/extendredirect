@@ -1,0 +1,8 @@
+#!/bin/bash
+## Description: Build the default install plus both v13 and v14 clickable demos
+## Usage: install-all [--fresh]
+## Example: "ddev install-all"
+
+set -e
+bash /var/www/html/Build/Scripts/setup-version-instance.sh 13 "$@"
+bash /var/www/html/Build/Scripts/setup-version-instance.sh 14 "$@"

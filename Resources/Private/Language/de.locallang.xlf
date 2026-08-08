@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.0">
+    <file source-language="en" target-language="de" datatype="plaintext" original="messages" date="2026-08-06T00:00:00Z" product-name="extendredirect">
+        <header/>
+        <body>
+            <trans-unit id="button.disableLog">
+                <source>Disable log</source>
+                <target>Deaktivierungs-Logs</target>
+            </trans-unit>
+
+            <trans-unit id="flashMessage.logsDeleted.message">
+                <source>All log entries have been deleted.</source>
+                <target>Alle Log-Einträge wurden gelöscht.</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.logsDeleted.title">
+                <source>Log cleared</source>
+                <target>Log geleert</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.logDeleted.message">
+                <source>The log entry has been deleted.</source>
+                <target>Der Log-Eintrag wurde gelöscht.</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.logDeleted.title">
+                <source>Entry deleted</source>
+                <target>Eintrag gelöscht</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.importInvalidCsv.message">
+                <source>Data could not be imported, the CSV file is invalid</source>
+                <target>Daten konnten nicht importiert werden CSV Datei ist fehlerhaft</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.importInvalidCsv.title">
+                <source>Invalid file</source>
+                <target>Fehlerhafte Datei</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.loopDetected.message">
+                <source>This redirect creates an infinite loop</source>
+                <target>Diese Weiterleitung erstellt eine Endlosschleife</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.loopDetected.title">
+                <source>Redirect disabled</source>
+                <target>Weiterleitung deaktiviert</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.adjusted.title">
+                <source>Redirect adjusted</source>
+                <target>Weiterleitung angepasst</target>
+            </trans-unit>
+
+            <trans-unit id="healthCheck.duplicateSourcePath">
+                <source>A redirect with an identical source path already exists.</source>
+                <target>Es existiert bereits eine Weiterleitung mit dem identischen Source Path.</target>
+            </trans-unit>
+            <trans-unit id="healthCheck.chainCorrected">
+                <source>Redirect chain corrected</source>
+                <target>Weiterleitungskette korrigiert</target>
+            </trans-unit>
+            <trans-unit id="healthCheck.loopRisk">
+                <source>There is a risk of an infinite loop!</source>
+                <target>Es besteht die Gefahr einer Endlosschleife!</target>
+            </trans-unit>
+            <trans-unit id="healthCheck.pageNotFound">
+                <source>Page not found</source>
+                <target>Seite nicht gefunden</target>
+            </trans-unit>
+
+            <trans-unit id="log.heading">
+                <source>Deactivated Redirects (Scheduler Health-Check)</source>
+                <target>Deaktivierte Redirects (Scheduler Health-Check)</target>
+            </trans-unit>
+            <trans-unit id="log.description">
+                <source>This list shows why a redirect was automatically deactivated by the scheduler task.</source>
+                <target>Diese Liste zeigt, warum ein Redirect vom Scheduler-Task automatisch deaktiviert wurde.</target>
+            </trans-unit>
+            <trans-unit id="log.deleteAll.button">
+                <source>Delete all logs</source>
+                <target>Alle Logs löschen</target>
+            </trans-unit>
+            <trans-unit id="log.deleteAll.confirmTitle">
+                <source>Delete all log entries</source>
+                <target>Alle Log-Einträge löschen</target>
+            </trans-unit>
+            <trans-unit id="log.deleteAll.confirmContent">
+                <source>Do you really want to delete all log entries?</source>
+                <target>Sollen wirklich alle Log-Einträge gelöscht werden?</target>
+            </trans-unit>
+            <trans-unit id="log.delete.title">
+                <source>Delete entry</source>
+                <target>Eintrag löschen</target>
+            </trans-unit>
+            <trans-unit id="log.delete.confirmTitle">
+                <source>Delete log entry</source>
+                <target>Log-Eintrag löschen</target>
+            </trans-unit>
+            <trans-unit id="log.delete.confirmContent">
+                <source>Should this log entry be deleted?</source>
+                <target>Soll dieser Log-Eintrag gelöscht werden?</target>
+            </trans-unit>
+            <trans-unit id="log.table.date">
+                <source>Date</source>
+                <target>Datum</target>
+            </trans-unit>
+            <trans-unit id="log.table.reason">
+                <source>Reason</source>
+                <target>Grund</target>
+            </trans-unit>
+            <trans-unit id="log.empty.title">
+                <source>No entries</source>
+                <target>Keine Einträge</target>
+            </trans-unit>
+            <trans-unit id="log.empty.message">
+                <source>No redirects have been deactivated by the scheduler task yet.</source>
+                <target>Es wurden noch keine Redirects vom Scheduler-Task deaktiviert.</target>
+            </trans-unit>
+            <trans-unit id="log.pagination.range">
+                <source>Entry %1$s - %2$s of %3$s</source>
+                <target>Eintrag %1$s - %2$s von %3$s</target>
+            </trans-unit>
+            <trans-unit id="log.pagination.page">
+                <source>Page %1$s / %2$s</source>
+                <target>Seite %1$s / %2$s</target>
+            </trans-unit>
+
+            <trans-unit id="pagination.firstPage">
+                <source>First page</source>
+                <target>Erste Seite</target>
+            </trans-unit>
+            <trans-unit id="pagination.previousPage">
+                <source>Previous page</source>
+                <target>Vorherige Seite</target>
+            </trans-unit>
+            <trans-unit id="pagination.nextPage">
+                <source>Next page</source>
+                <target>Nächste Seite</target>
+            </trans-unit>
+            <trans-unit id="pagination.lastPage">
+                <source>Last page</source>
+                <target>Letzte Seite</target>
+            </trans-unit>
+
+            <trans-unit id="common.cancel">
+                <source>Cancel</source>
+                <target>Abbrechen</target>
+            </trans-unit>
+        </body>
+    </file>
+</xliff>

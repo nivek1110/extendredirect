@@ -1,0 +1,10 @@
+# PHPStan config. The TYPO3 (saschaegerer/phpstan-typo3) and PHPUnit extensions are wired in
+# automatically by phpstan/extension-installer, so no `includes` are needed here.
+parameters:
+    level: 8
+    paths:
+        - ../../Classes
+        - ../../Tests
+    # The TYPO3 testing-framework base classes live under .Build and are picked up via autoload.
+    bootstrapFiles:
+        - ../../.Build/vendor/autoload.php

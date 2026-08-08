@@ -1,0 +1,6 @@
+#!/bin/bash
+## Description: Build the clickable TYPO3 v14 demo at https://v14.extendredirect.ddev.site/
+## Usage: install-v14 [--fresh]
+## Example: "ddev install-v14" or "ddev install-v14 --fresh"
+
+bash /var/www/html/Build/Scripts/setup-version-instance.sh 14 "$@"
