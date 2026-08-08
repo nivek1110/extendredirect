@@ -84,6 +84,7 @@ class RedirectRepositoryTest extends FunctionalTestCase
         $this->subject->disable($uid);
 
         $result = $this->subject->findByUid($uid);
+        self::assertIsArray($result);
         self::assertSame(1, (int) $result['disabled']);
         self::assertSame(1, (int) $result['broken_redirect']);
     }
@@ -132,6 +133,7 @@ class RedirectRepositoryTest extends FunctionalTestCase
         $this->subject->updateHealthCheckResult($uid, true, 3, 't3://page?uid=7');
 
         $result = $this->subject->findByUid($uid);
+        self::assertIsArray($result);
         self::assertSame(1, (int) $result['broken_redirect']);
         self::assertSame('3', (string) $result['redirect_count']);
         self::assertSame(1, (int) $result['disabled']);

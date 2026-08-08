@@ -43,17 +43,24 @@ class SuppressRecordSavedNotificationMiddlewareTest extends TestCase
 
     /**
      * @param array<int, string> $sessionMessages
+     * @return object{savedSessionData: array<int, string>, saveCalls: int, readCalls: int}
      */
     private function createBackendUserFake(array $sessionMessages): object
     {
-        return new class($sessionMessages) {
+        return new class ($sessionMessages) {
             /** @var array<int, string> */
             public array $savedSessionData = [];
             public int $saveCalls = 0;
             public int $readCalls = 0;
 
+            /**
+             * @param array<int, string> $sessionMessages
+             */
             public function __construct(private array $sessionMessages) {}
 
+            /**
+             * @return array<int, string>
+             */
             public function getSessionData(string $key): array
             {
                 $this->readCalls++;
@@ -90,8 +97,8 @@ class SuppressRecordSavedNotificationMiddlewareTest extends TestCase
         $request = (new ServerRequest())->withParsedBody(['data' => ['sys_redirect' => ['1' => ['target' => '/foo']]]]);
         $response = $this->createStub(ResponseInterface::class);
 
-        $keptMessage = json_encode(['title' => 'Something else']);
-        $recordSavedMessage = json_encode(['title' => 'Record saved']);
+        $keptMessage = (string) json_encode(['title' => 'Something else']);
+        $recordSavedMessage = (string) json_encode(['title' => 'Record saved']);
 
         $backendUser = $this->createBackendUserFake([$keptMessage, $recordSavedMessage]);
         $GLOBALS['BE_USER'] = $backendUser;
@@ -109,7 +116,7 @@ class SuppressRecordSavedNotificationMiddlewareTest extends TestCase
         $request = (new ServerRequest())->withParsedBody(['data' => ['sys_redirect' => ['1' => ['target' => '/foo']]]]);
         $response = $this->createStub(ResponseInterface::class);
 
-        $keptMessage = json_encode(['title' => 'Something else']);
+        $keptMessage = (string) json_encode(['title' => 'Something else']);
 
         $backendUser = $this->createBackendUserFake([$keptMessage]);
         $GLOBALS['BE_USER'] = $backendUser;

@@ -23,6 +23,7 @@ class DisableLogRepositoryTest extends FunctionalTestCase
 
     /**
      * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
      */
     private function logEntry(array $overrides = []): array
     {

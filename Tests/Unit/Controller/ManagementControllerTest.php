@@ -20,15 +20,27 @@ class ManagementControllerTest extends TestCase
     private function createController(): ManagementController
     {
         $constructor = (new \ReflectionClass(ManagementController::class))->getConstructor();
+        if ($constructor === null) {
+            throw new \RuntimeException('ManagementController is expected to inherit a constructor from its core parent.');
+        }
+
         $arguments = [];
         foreach ($constructor->getParameters() as $parameter) {
             $type = $parameter->getType();
-            $arguments[] = $this->createArgument($type instanceof \ReflectionNamedType ? $type->getName() : \stdClass::class);
+            $name = $type instanceof \ReflectionNamedType ? $type->getName() : \stdClass::class;
+            /** @var class-string $name */
+            $arguments[] = $this->createArgument($name);
         }
 
+        // Arguments are built dynamically from the constructor's own reflection, so PHPStan
+        // can't match them against its fixed parameter types.
+        // @phpstan-ignore argument.type
         return new ManagementController(...$arguments);
     }
 
+    /**
+     * @param class-string $className
+     */
     private function createArgument(string $className): object
     {
         try {

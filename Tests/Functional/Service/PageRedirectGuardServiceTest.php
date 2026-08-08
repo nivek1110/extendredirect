@@ -66,6 +66,7 @@ class PageRedirectGuardServiceTest extends FunctionalTestCase
         $this->subject->disableRedirectsTargetingPage($pageUid, 'healthCheck.targetPageHidden');
 
         $result = $this->redirectRepository->findByUid($redirectUid);
+        self::assertIsArray($result);
         self::assertSame(1, (int) $result['disabled']);
     }
 
@@ -77,6 +78,7 @@ class PageRedirectGuardServiceTest extends FunctionalTestCase
         $this->subject->disableRedirectsTargetingPage($pageUid, 'healthCheck.targetPageDeleted');
 
         $result = $this->redirectRepository->findByUid($redirectUid);
+        self::assertIsArray($result);
         self::assertSame(1, (int) $result['disabled']);
     }
 
@@ -115,6 +117,7 @@ class PageRedirectGuardServiceTest extends FunctionalTestCase
         $this->subject->disableRedirectsTargetingPage($pageUid, 'healthCheck.targetPageHidden');
 
         $result = $this->redirectRepository->findByUid($redirectUid);
+        self::assertIsArray($result);
         self::assertSame(0, (int) $result['disabled']);
     }
 }

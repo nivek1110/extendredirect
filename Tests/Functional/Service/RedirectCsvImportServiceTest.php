@@ -29,7 +29,7 @@ class RedirectCsvImportServiceTest extends FunctionalTestCase
         $GLOBALS['LANG'] = GeneralUtility::makeInstance(LanguageServiceFactory::class)->create('en');
         $this->subject = GeneralUtility::makeInstance(RedirectCsvImportService::class);
         $this->csvPath = $this->instancePath . '/typo3temp/var/tests/import.csv';
-        @mkdir(dirname($this->csvPath), 0777, true);
+        @mkdir(dirname($this->csvPath), 0o777, true);
 
         $this->setUpBackendUserWithAdminRights();
     }
