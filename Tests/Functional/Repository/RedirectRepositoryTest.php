@@ -240,4 +240,96 @@ class RedirectRepositoryTest extends FunctionalTestCase
 
         self::assertTrue($this->subject->existsBySourcePath('/old', '*'));
     }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return list<string>
+     */
+    private function sourcePaths(array $rows): array
+    {
+        return array_values(array_map(static fn(array $row): string => (string) $row['source_path'], $rows));
+    }
+
+    public function testFindRedirectsByRbDemandFiltersBySourceHost(): void
+    {
+        $this->insertRedirect(['source_host' => 'a.example.com', 'source_path' => '/on-a']);
+        $this->insertRedirect(['source_host' => 'b.example.com', 'source_path' => '/on-b']);
+        $this->insertRedirect(['source_host' => '*', 'source_path' => '/on-any']);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(sourceHosts: ['a.example.com']));
+
+        self::assertSame(['/on-a'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandFiltersByTargetSubstring(): void
+    {
+        $this->insertRedirect(['source_path' => '/one', 'target' => '/products/shoes']);
+        $this->insertRedirect(['source_path' => '/two', 'target' => '/about-us']);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(target: 'products'));
+
+        self::assertSame(['/one'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandTreatsLikeWildcardsInTargetAsLiterals(): void
+    {
+        $this->insertRedirect(['source_path' => '/literal', 'target' => '/a%b']);
+        $this->insertRedirect(['source_path' => '/other', 'target' => '/axyb']);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(target: 'a%b'));
+
+        self::assertSame(['/literal'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandFiltersByStatusCode(): void
+    {
+        $this->insertRedirect(['source_path' => '/permanent', 'target_statuscode' => 301]);
+        $this->insertRedirect(['source_path' => '/found', 'target_statuscode' => 302]);
+        $this->insertRedirect(['source_path' => '/permanent-308', 'target_statuscode' => 308]);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(statusCodes: [302]));
+
+        self::assertSame(['/found'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandMaxHitsKeepsOnlyRedirectsBelowTheLimitWithHitCounting(): void
+    {
+        $this->insertRedirect(['source_path' => '/few-hits', 'hitcount' => 5]);
+        $this->insertRedirect(['source_path' => '/many-hits', 'hitcount' => 50]);
+        $this->insertRedirect(['source_path' => '/no-counting', 'hitcount' => 0, 'disable_hitcount' => 1]);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(maxHits: 10));
+
+        self::assertSame(['/few-hits'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandCombinesAllFiltersWithAnd(): void
+    {
+        $this->insertRedirect(['source_host' => 'a.example.com', 'source_path' => '/match', 'target' => '/shop', 'target_statuscode' => 302, 'hitcount' => 1]);
+        $this->insertRedirect(['source_host' => 'a.example.com', 'source_path' => '/wrong-status', 'target' => '/shop', 'target_statuscode' => 301, 'hitcount' => 1]);
+        $this->insertRedirect(['source_host' => 'b.example.com', 'source_path' => '/wrong-host', 'target' => '/shop', 'target_statuscode' => 302, 'hitcount' => 1]);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(
+            sourceHosts: ['a.example.com'],
+            sourcePath: 'mat',
+            target: 'shop',
+            statusCodes: [302],
+            maxHits: 10
+        ));
+
+        self::assertSame(['/match'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandHonoursOrderFieldAndDirection(): void
+    {
+        $this->insertRedirect(['source_path' => '/b']);
+        $this->insertRedirect(['source_path' => '/c']);
+        $this->insertRedirect(['source_path' => '/a']);
+
+        $ascending = $this->subject->findRedirectsByRbDemand(new RedirectDemand(orderField: 'source_path', orderDirection: 'asc'));
+        $descending = $this->subject->findRedirectsByRbDemand(new RedirectDemand(orderField: 'source_path', orderDirection: 'desc'));
+
+        self::assertSame(['/a', '/b', '/c'], $this->sourcePaths($ascending));
+        self::assertSame(['/c', '/b', '/a'], $this->sourcePaths($descending));
+    }
 }
