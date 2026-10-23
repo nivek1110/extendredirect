@@ -40,20 +40,20 @@ class PageRedirectGuardService
      */
     protected function disableRedirectForTargetPage(array $redirect, string $reasonKey, RedirectRepository $redirectRepository): void
     {
-        if ((int)($redirect['disabled'] ?? 0) === 1) {
+        if ((int) ($redirect['disabled'] ?? 0) === 1) {
             return;
         }
 
-        $redirectRepository->disable((int)$redirect['uid']);
+        $redirectRepository->disable((int) $redirect['uid']);
 
         $logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
         $logRepository->add([
             'pid' => 0,
             'crdate' => GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp'),
-            'redirect_uid' => (int)$redirect['uid'],
-            'source_host' => (string)($redirect['source_host'] ?? ''),
-            'source_path' => (string)($redirect['source_path'] ?? ''),
-            'target' => (string)($redirect['target'] ?? ''),
+            'redirect_uid' => (int) $redirect['uid'],
+            'source_host' => (string) ($redirect['source_host'] ?? ''),
+            'source_path' => (string) ($redirect['source_path'] ?? ''),
+            'target' => (string) ($redirect['target'] ?? ''),
             'status_code' => '',
             'reason' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:' . $reasonKey),
         ]);

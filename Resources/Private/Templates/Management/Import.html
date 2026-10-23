@@ -15,30 +15,39 @@
             4: '@typo3/redirects/redirects-module.js',
         }"
     />
-    <h3>CSV Format - Semicolon seperated<br/> (Allow Statuscode: 301,302,303,307,308)</h3>
-    <a target="_blank" class="btn btn-default btn-sm" href="{f:uri.resource(path: 'EXT:twt_redirect/Resources/Public/redirect.csv')}">Download Example CSV</a>
+    <h3><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.format.title" /><br/> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.format.subtitle" /></h3>
+    <a target="_blank" class="btn btn-default btn-sm" href="{f:uri.resource(path: 'EXT:extendredirect/Resources/Public/redirect.csv')}"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.downloadExample" /></a>
     <hr class="double" />
     <table class="table table-striped table-hover">
         <thead>
             <tr>
+                <th>source_host</th>
                 <th>source_path</th>
                 <th>target</th>
                 <th>target_statuscode</th>
+                <th>respect_query_parameters</th>
+                <th>keep_query_parameters</th>
+                <th>force_https</th>
             </tr>
         </thead>
         <tbody>
             <tr>
+                <td>*</td>
                 <td>/source_example</td>
                 <td>/target_example</td>
                 <td>307</td>
+                <td></td>
+                <td></td>
+                <td></td>
             </tr>
         </tbody>
     </table>
+    <p><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.format.optionalColumns" /></p>
 
     <form action="{f:be.uri(route: 'redirect_import')}" method="post" enctype="multipart/form-data">
-        <h2>Import Redirects</h2>
+        <h2><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.heading" /></h2>
         <f:form.upload name="redirect" /><br /><br />
-        <f:form.submit value="Import file" />
+        <f:form.submit value="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.submit')}" />
     </form>
     <f:comment>
     <f:form action="import" enctype="multipart/form-data" name="redirectImport" object="{redirectImport}">
@@ -50,8 +59,8 @@
     <f:if condition="{imported} || {ignoreCounter}">
         <hr class="double" />
         <div>
-            <h4><b>{imported}</b> from {counter} Redirects imported</h4>
-            <h4><b>{ignoreCounter}</b> from {counter} Redirects skipped</h4>
+            <h4><b>{imported}</b> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.result.imported" arguments="{0: counter}" /></h4>
+            <h4><b>{ignoreCounter}</b> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:import.result.skipped" arguments="{0: counter}" /></h4>
         </div>
     </f:if>
 </f:section>

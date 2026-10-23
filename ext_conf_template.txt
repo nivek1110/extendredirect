@@ -1,5 +1,2 @@
-# cat=basic; type=string; label=SAP API Key
-username =
-
-# cat=basic; type=string; label=SAP Secret Key
-password =
+# cat=basic; type=options[HTTP request=request,Database only (no HTTP request)=database]; label=Redirect check mode: "HTTP request" follows the redirect live over HTTP like a browser would; "Database only" resolves the target directly against the pages/redirects tables without firing any request.
+checkMode = request

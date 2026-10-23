@@ -15,6 +15,7 @@ xdebug_enabled: false
 additional_hostnames:
     - v13.extendredirect
     - v14.extendredirect
+    - extendredirect1
 additional_fqdns: []
 database:
     type: mariadb

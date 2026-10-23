@@ -140,6 +140,131 @@
                 <source>Cancel</source>
                 <target>Abbrechen</target>
             </trans-unit>
+
+            <trans-unit id="button.import">
+                <source>Import redirect</source>
+                <target>Redirect importieren</target>
+            </trans-unit>
+
+            <trans-unit id="filter.brokenRedirect.error">
+                <source>Redirect with Error</source>
+                <target>Redirect mit Fehler</target>
+            </trans-unit>
+
+            <trans-unit id="filter.brokenRedirect.label">
+                <source>Broken Redirect</source>
+                <target>Defekter Redirect</target>
+            </trans-unit>
+
+            <trans-unit id="flashMessage.importUnknownSourceHost.message">
+                <source>Row "%2$s" skipped: source domain "%1$s" does not match any configured site. Wrong source_host set in the CSV.</source>
+                <target>Zeile "%2$s" übersprungen: Die Quell-Domain "%1$s" entspricht keiner konfigurierten Site. In der CSV ist ein falscher source_host gesetzt.</target>
+            </trans-unit>
+
+            <trans-unit id="flashMessage.importUnknownSourceHost.title">
+                <source>Unknown source domain</source>
+                <target>Unbekannte Quell-Domain</target>
+            </trans-unit>
+
+            <trans-unit id="healthCheck.domainCheckFailed">
+                <source>Source domain %1$s: %2$s</source>
+                <target>Quell-Domain %1$s: %2$s</target>
+            </trans-unit>
+
+            <trans-unit id="healthCheck.notFound">
+                <source>The page was not found!</source>
+                <target>Die Seite wurde nicht gefunden!</target>
+            </trans-unit>
+
+            <trans-unit id="healthCheck.targetPageDeleted">
+                <source>The target page was deleted.</source>
+                <target>Die Zielseite wurde gelöscht.</target>
+            </trans-unit>
+
+            <trans-unit id="healthCheck.targetPageHidden">
+                <source>The target page was hidden.</source>
+                <target>Die Zielseite wurde versteckt.</target>
+            </trans-unit>
+
+            <trans-unit id="import.downloadExample">
+                <source>Download example CSV</source>
+                <target>Beispiel-CSV herunterladen</target>
+            </trans-unit>
+
+            <trans-unit id="import.format.optionalColumns">
+                <source>respect_query_parameters, keep_query_parameters and force_https are optional: leave the cell empty to skip, any other value enables it.</source>
+                <target>respect_query_parameters, keep_query_parameters und force_https sind optional: Zelle leer lassen zum Überspringen, jeder andere Wert aktiviert die Option.</target>
+            </trans-unit>
+
+            <trans-unit id="import.format.subtitle">
+                <source>(allowed status codes: 301, 302, 303, 307, 308)</source>
+                <target>(erlaubte Statuscodes: 301, 302, 303, 307, 308)</target>
+            </trans-unit>
+
+            <trans-unit id="import.format.title">
+                <source>CSV format - semicolon separated</source>
+                <target>CSV-Format – durch Semikolon getrennt</target>
+            </trans-unit>
+
+            <trans-unit id="import.heading">
+                <source>Import Redirects</source>
+                <target>Redirects importieren</target>
+            </trans-unit>
+
+            <trans-unit id="import.result.imported">
+                <source>of %1$s redirects imported</source>
+                <target>von %1$s Redirects importiert</target>
+            </trans-unit>
+
+            <trans-unit id="import.result.skipped">
+                <source>of %1$s redirects skipped</source>
+                <target>von %1$s Redirects übersprungen</target>
+            </trans-unit>
+
+            <trans-unit id="import.submit">
+                <source>Import file</source>
+                <target>Datei importieren</target>
+            </trans-unit>
+
+            <trans-unit id="log.table.redirectCount">
+                <source>Redirect Count</source>
+                <target>Anzahl Weiterleitungen</target>
+            </trans-unit>
+
+            <trans-unit id="log.table.sourceHost">
+                <source>Source Host</source>
+                <target>Quell-Host</target>
+            </trans-unit>
+
+            <trans-unit id="log.table.sourcePath">
+                <source>Source Path</source>
+                <target>Quell-Pfad</target>
+            </trans-unit>
+
+            <trans-unit id="log.table.target">
+                <source>Target</source>
+                <target>Ziel</target>
+            </trans-unit>
+
+            <trans-unit id="table.redirectCounter">
+                <source>Redirect Counter (Redirect Chain)</source>
+                <target>Weiterleitungszähler (Redirect-Kette)</target>
+            </trans-unit>
+
+            <trans-unit id="command.checkRedirects.description">
+                <source>Check all redirects and disable broken ones</source>
+                <target>Alle Redirects prüfen und defekte deaktivieren</target>
+            </trans-unit>
+
+            <trans-unit id="command.cleanupLog.description">
+                <source>Delete disable log entries older than a given number of days</source>
+                <target>Deaktivierungs-Log-Einträge löschen, die älter als die angegebene Anzahl Tage sind</target>
+            </trans-unit>
+
+            <trans-unit id="command.cleanupLog.option.days">
+                <source>Delete log entries older than this many days</source>
+                <target>Log-Einträge löschen, die älter als diese Anzahl Tage sind</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

@@ -5,8 +5,8 @@
 <f:layout name="Module" />
 
 <f:section name="Content">
-    <h2>Deaktivierte Redirects (Scheduler Health-Check)</h2>
-    <p>Diese Liste zeigt, warum ein Redirect vom Scheduler-Task automatisch deaktiviert wurde.</p>
+    <h2><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.heading" /></h2>
+    <p><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.description" /></p>
 
     <f:if condition="{logs -> f:count()}">
         <f:then>
@@ -14,10 +14,10 @@
                 <a class="btn btn-danger btn-sm t3js-modal-trigger"
                    href="{f:be.uri(route: 'redirect_disable_log_delete', parameters: '{deleteAll: 1}')}"
                    data-severity="warning"
-                   data-title="Alle Log-Einträge löschen"
-                   data-bs-content="Sollen wirklich alle Log-Einträge gelöscht werden?"
-                   data-button-close-text="Abbrechen">
-                    <core:icon identifier="actions-delete" /> Alle Logs löschen
+                   data-title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.deleteAll.confirmTitle')}"
+                   data-bs-content="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.deleteAll.confirmContent')}"
+                   data-button-close-text="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:common.cancel')}">
+                    <core:icon identifier="actions-delete" /> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.deleteAll.button" />
                 </a>
             </div>
 
@@ -25,12 +25,12 @@
                 <table class="table table-striped table-hover">
                     <thead>
                         <tr>
-                            <th>Datum</th>
-                            <th>Source Host</th>
-                            <th>Source Path</th>
-                            <th>Target</th>
-                            <th>Redirect Count</th>
-                            <th>Grund</th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.date" /></th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.sourceHost" /></th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.sourcePath" /></th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.target" /></th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.redirectCount" /></th>
+                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.reason" /></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -46,11 +46,11 @@
                                 <td>
                                     <a class="btn btn-default btn-sm t3js-modal-trigger"
                                        href="{f:be.uri(route: 'redirect_disable_log_delete', parameters: '{logUid: log.uid}')}"
-                                       title="Eintrag löschen"
+                                       title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.title')}"
                                        data-severity="warning"
-                                       data-title="Log-Eintrag löschen"
-                                       data-bs-content="Soll dieser Log-Eintrag gelöscht werden?"
-                                       data-button-close-text="Abbrechen">
+                                       data-title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.confirmTitle')}"
+                                       data-bs-content="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.confirmContent')}"
+                                       data-button-close-text="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:common.cancel')}">
                                         <core:icon identifier="actions-delete" />
                                     </a>
                                 </td>
@@ -66,10 +66,10 @@
                         <f:if condition="{pagination.hasLessPages}">
                             <f:then>
                                 <li class="page-item">
-                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: 1}')}" title="Erste Seite"><core:icon identifier="actions-view-paging-first" /></a>
+                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: 1}')}" title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:pagination.firstPage')}"><core:icon identifier="actions-view-paging-first" /></a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.previousPage}')}" title="Vorherige Seite"><core:icon identifier="actions-view-paging-previous" /></a>
+                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.previousPage}')}" title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:pagination.previousPage')}"><core:icon identifier="actions-view-paging-previous" /></a>
                                 </li>
                             </f:then>
                             <f:else>
@@ -78,18 +78,18 @@
                             </f:else>
                         </f:if>
                         <li class="page-item disabled">
-                            <span class="page-link">Eintrag {pagination.startRecord} - {pagination.endRecord} von {pagination.count}</span>
+                            <span class="page-link"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.pagination.range" arguments="{0: pagination.startRecord, 1: pagination.endRecord, 2: pagination.count}" /></span>
                         </li>
                         <li class="page-item disabled">
-                            <span class="page-link">Seite {pagination.current} / {pagination.numberOfPages}</span>
+                            <span class="page-link"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.pagination.page" arguments="{0: pagination.current, 1: pagination.numberOfPages}" /></span>
                         </li>
                         <f:if condition="{pagination.hasMorePages}">
                             <f:then>
                                 <li class="page-item">
-                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.nextPage}')}" title="Nächste Seite"><core:icon identifier="actions-view-paging-next" /></a>
+                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.nextPage}')}" title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:pagination.nextPage')}"><core:icon identifier="actions-view-paging-next" /></a>
                                 </li>
                                 <li class="page-item">
-                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.numberOfPages}')}" title="Letzte Seite"><core:icon identifier="actions-view-paging-last" /></a>
+                                    <a class="page-link" href="{f:be.uri(route: 'redirect_disable_log', parameters: '{page: pagination.numberOfPages}')}" title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:pagination.lastPage')}"><core:icon identifier="actions-view-paging-last" /></a>
                                 </li>
                             </f:then>
                             <f:else>
@@ -102,8 +102,8 @@
             </f:if>
         </f:then>
         <f:else>
-            <f:be.infobox state="0" title="Keine Einträge">
-                <p>Es wurden noch keine Redirects vom Scheduler-Task deaktiviert.</p>
+            <f:be.infobox state="0" title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.empty.title')}">
+                <p><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.empty.message" /></p>
             </f:be.infobox>
         </f:else>
     </f:if>

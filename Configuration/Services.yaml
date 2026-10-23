@@ -4,19 +4,27 @@ services:
     autoconfigure: true
     public: true
 
-  TWT\TwtRedirect\:
+  Nivek1110\Extendredirect\:
     resource: '../Classes/*'
 
-  TWT\TwtRedirect\Controller\ManagementController:
+  Nivek1110\Extendredirect\Controller\ManagementController:
     tags: [ 'backend.controller' ]
 
-  TWT\TwtRedirect\Command\CheckCommand:
+  Nivek1110\Extendredirect\Command\CheckCommand:
     tags:
       - name: 'console.command'
-        command: 'twtredirect:checkredirects'
+        command: 'extendredirect:checkredirects'
+        description: 'Check all redirects and disable broken ones'
         schedulable: true
 
-  TWT\TwtRedirect\EventListener\AddFilterEventListener:
+  Nivek1110\Extendredirect\Command\CleanupLogCommand:
+    tags:
+      - name: 'console.command'
+        command: 'extendredirect:cleanuplog'
+        description: 'Delete disable log entries older than a given number of days'
+        schedulable: true
+
+  Nivek1110\Extendredirect\EventListener\AddFilterEventListener:
     tags:
       - name: event.listener
-        identifier: 'twt_redirect/add-filter-event-listener'
+        identifier: 'extendredirect/add-filter-event-listener'

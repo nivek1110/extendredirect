@@ -175,6 +175,18 @@
             <trans-unit id="table.redirectCounter">
                 <source>Redirect Counter (Redirect Chain)</source>
             </trans-unit>
+
+            <trans-unit id="command.checkRedirects.description">
+                <source>Check all redirects and disable broken ones</source>
+            </trans-unit>
+
+            <trans-unit id="command.cleanupLog.description">
+                <source>Delete disable log entries older than a given number of days</source>
+            </trans-unit>
+
+            <trans-unit id="command.cleanupLog.option.days">
+                <source>Delete log entries older than this many days</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

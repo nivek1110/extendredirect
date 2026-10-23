@@ -4,18 +4,18 @@ return [
     'record_import' => [
         'path' => '/record_import',
         'access' => 'public',
-        'target' => \TWT\TwtRedirect\Controller\ManagementController::class . '::handleImportRequest',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::handleImportRequest',
     ],
     'redirect_import' => [
         'path' => '/redirect_import',
-        'target' => \TWT\TwtRedirect\Controller\ManagementController::class . '::importAction',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::importAction',
     ],
     'redirect_disable_log' => [
         'path' => '/redirect_disable_log',
-        'target' => \TWT\TwtRedirect\Controller\ManagementController::class . '::handleLogRequest',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::handleLogRequest',
     ],
     'redirect_disable_log_delete' => [
         'path' => '/redirect_disable_log_delete',
-        'target' => \TWT\TwtRedirect\Controller\ManagementController::class . '::deleteLogAction',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::deleteLogAction',
     ],
 ];

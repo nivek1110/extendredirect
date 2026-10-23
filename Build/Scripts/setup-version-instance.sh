@@ -60,7 +60,8 @@ composer config prefer-stable true
 # compatibility, but EXT:extendredirect requires >=8.3. Align the platform with the
 # container's actual PHP so the extension resolves.
 composer config platform.php "$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION.".".PHP_RELEASE_VERSION;')"
-composer require "nivek1110/extendredirect:*" typo3/cms-fluid-styled-content:"${TYPO3_CONSTRAINT}" --no-interaction --no-progress
+# helhum/typo3-console provides the configuration:set / asset:publish commands setup-demo-instance.sh calls.
+composer require "nivek1110/extendredirect:*" typo3/cms-fluid-styled-content:"${TYPO3_CONSTRAINT}" "helhum/typo3-console:^9.0" --no-interaction --no-progress
 
 echo "› granting the ddev db user access to ${DB_NAME}"
 mysql -h db -u root -proot -e \

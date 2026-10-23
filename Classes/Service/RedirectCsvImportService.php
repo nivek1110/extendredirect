@@ -37,7 +37,7 @@ class RedirectCsvImportService
         if (is_resource($file)) {
             while (($data = fgetcsv($file, 9999, ';')) !== false) {
                 if ($flag) {
-                    $header = array_map(static fn ($value): string => (string)$value, $data);
+                    $header = array_map(static fn($value): string => (string) $value, $data);
                     $flag = false;
                     continue;
                 }
@@ -54,7 +54,7 @@ class RedirectCsvImportService
 
                 $missingFields = array_filter(
                     self::REQUIRED_FIELDS,
-                    static fn (string $field): bool => !isset($data[$field])
+                    static fn(string $field): bool => !isset($data[$field])
                 );
                 if ($missingFields !== []) {
                     $messages[] = [
@@ -82,15 +82,15 @@ class RedirectCsvImportService
                     continue;
                 }
 
-                if (GeneralUtility::makeInstance(RedirectRepository::class)->existsBySourcePath((string)$data['source_path'])) {
+                if (GeneralUtility::makeInstance(RedirectRepository::class)->existsBySourcePath((string) $data['source_path'], (string) $data['source_host'])) {
                     $ignoreCounter++;
                     continue;
                 }
 
-                if (!in_array((int)$data['target_statuscode'], self::ALLOWED_STATUS_CODES, true)) {
+                if (!in_array((int) $data['target_statuscode'], self::ALLOWED_STATUS_CODES, true)) {
                     $data['target_statuscode'] = 308;
                 } else {
-                    $data['target_statuscode'] = (int)$data['target_statuscode'];
+                    $data['target_statuscode'] = (int) $data['target_statuscode'];
                 }
 
                 foreach (self::OPTIONAL_BOOLEAN_FIELDS as $field) {
@@ -106,7 +106,7 @@ class RedirectCsvImportService
                 $data['pid'] = '0';
 
                 $healthCheckService = GeneralUtility::makeInstance(HealthCheckService::class);
-                $page = $healthCheckService->getPageIdFromPath((string)$data['target']);
+                $page = $healthCheckService->getPageIdFromPath((string) $data['target']);
                 if (is_array($page) && array_key_exists('uid', $page)) {
                     $linkHandler = GeneralUtility::makeInstance(PageLinkHandler::class);
                     $url = $linkHandler->asString(['pageuid' => $page['uid']]);
@@ -139,7 +139,7 @@ class RedirectCsvImportService
         $siteFinder = GeneralUtility::makeInstance(SiteFinder::class);
 
         return array_map(
-            static fn ($site): string => $site->getBase()->getHost(),
+            static fn($site): string => $site->getBase()->getHost(),
             array_values($siteFinder->getAllSites())
         );
     }

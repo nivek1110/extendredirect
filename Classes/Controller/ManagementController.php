@@ -1,49 +1,37 @@
 <?php
 
-namespace TWT\TwtRedirect\Controller;
+namespace Nivek1110\Extendredirect\Controller;
 
-use Doctrine\DBAL\Result;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use TWT\TwtRedirect\Repository\DisableLogRepository;
-use TWT\TwtRedirect\Repository\RedirectRepository;
-use TWT\TwtRedirect\Service\HealthCheckService;
+use Nivek1110\Extendredirect\Repository\DisableLogRepository;
+use Nivek1110\Extendredirect\Service\RedirectCsvImportService;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
+use TYPO3\CMS\Backend\Template\Components\Buttons\LinkButton;
+use TYPO3\CMS\Backend\Template\Components\ComponentFactory;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
-use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\QueryBuilder;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\DataHandling\DataHandler;
-use TYPO3\CMS\Core\Exception;
 use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Http\UploadedFile;
-use TYPO3\CMS\Core\Imaging\Icon;
-use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\LinkHandling\PageLinkHandler;
+use TYPO3\CMS\Core\Imaging\IconSize;
+use TYPO3\CMS\Core\Information\Typo3Version;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Redirects\Repository\Demand;
 
 class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementController
 {
-    private const ALLOWED_STATUS_CODES = [301, 302, 303, 307, 308];
-
-
-    public function __construct(UriBuilder $uriBuilder, IconFactory $iconFactory, \TYPO3\CMS\Redirects\Repository\RedirectRepository $redirectRepository, ModuleTemplateFactory $moduleTemplateFactory, EventDispatcherInterface $eventDispatcher)
-    {
-        parent::__construct($uriBuilder, $iconFactory, $redirectRepository, $moduleTemplateFactory, $eventDispatcher);
-    }
+    // No own constructor: the core parent's constructor signature differs between
+    // TYPO3 13 (5 args) and 14 (7 args, adds ComponentFactory + ModulePaginationService).
+    // Inheriting it directly keeps this class buildable on both without duplicating
+    // whichever param list the installed core version happens to require.
 
     public function handleImportRequest(ServerRequest $request): ResponseInterface
     {
         $view = $this->moduleTemplateFactory->create($request);
-        $this->registerDocHeaderButtonsBack($view, (string)$request->getAttribute('normalizedParams')?->getRequestUri());
+        $this->registerDocHeaderButtonsBack($view, (string) $request->getAttribute('normalizedParams')?->getRequestUri());
 
         return $view->renderResponse('Management/Import');
     }
@@ -51,7 +39,7 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
     public function importAction(ServerRequestInterface $request): ResponseInterface
     {
         $view = $this->moduleTemplateFactory->create($request);
-        $this->registerDocHeaderButtonsBack($view, (string)$request->getAttribute('normalizedParams')?->getRequestUri());
+        $this->registerDocHeaderButtonsBack($view, (string) $request->getAttribute('normalizedParams')?->getRequestUri());
 
         if (array_key_exists('redirect', $request->getUploadedFiles())) {
             /* @var UploadedFile $file */
@@ -68,14 +56,14 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
     public function handleLogRequest(ServerRequestInterface $request): ResponseInterface
     {
         $view = $this->moduleTemplateFactory->create($request);
-        $this->registerDocHeaderButtonsBack($view, (string)$request->getAttribute('normalizedParams')?->getRequestUri());
+        $this->registerDocHeaderButtonsBack($view, (string) $request->getAttribute('normalizedParams')?->getRequestUri());
 
         $logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
 
         $itemsPerPage = 20;
         $count = $logRepository->countAll();
-        $numberOfPages = (int)max(1, ceil($count / $itemsPerPage));
-        $currentPage = max(1, (int)($request->getQueryParams()['page'] ?? 1));
+        $numberOfPages = (int) max(1, ceil($count / $itemsPerPage));
+        $currentPage = max(1, (int) ($request->getQueryParams()['page'] ?? 1));
         if ($currentPage > $numberOfPages) {
             $currentPage = $numberOfPages;
         }
@@ -108,189 +96,158 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         $logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
         $parameters = $request->getQueryParams();
 
+        $languageService = $this->getLanguageService();
         if (!empty($parameters['deleteAll'])) {
             $logRepository->deleteAll();
-            $this->addFlashMessage('Alle Log-Einträge wurden gelöscht.', 'Log geleert');
+            $this->addFlashMessage(
+                $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.logsDeleted.message'),
+                $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.logsDeleted.title')
+            );
         } elseif (!empty($parameters['logUid'])) {
-            $logRepository->deleteByUid((int)$parameters['logUid']);
-            $this->addFlashMessage('Der Log-Eintrag wurde gelöscht.', 'Eintrag gelöscht');
+            $logRepository->deleteByUid((int) $parameters['logUid']);
+            $this->addFlashMessage(
+                $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.logDeleted.message'),
+                $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.logDeleted.title')
+            );
         }
 
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-        return new RedirectResponse((string)$uriBuilder->buildUriFromRoute('redirect_disable_log'));
+        return new RedirectResponse((string) $uriBuilder->buildUriFromRoute('redirect_disable_log'));
     }
 
     protected function importRedirect(string $uploadedFile, ModuleTemplate $view): void
     {
-        $counter = 0;
-        $imported = 0;
-        $ignoreCounter = 0;
+        $result = GeneralUtility::makeInstance(RedirectCsvImportService::class)->importFromCsvFile($uploadedFile);
 
-        $file = fopen($uploadedFile, 'r');
-        $flag = true;
-        $header = [];
-
-        if (is_resource($file)) {
-
-            while (($data = fgetcsv($file, 9999, ';')) !== false) {
-                if ($flag) {
-                    $header = $data;
-                    $flag = false;
-                    continue;
-                }
-                $headerCount = count($header);
-                $dataCount = count($data);
-                if ($headerCount > $dataCount) {
-                    $fill = $headerCount - $dataCount;
-                    for ($i = 0; $i < $fill; $i++) {
-                        $data[] = '';
-                    }
-                }
-                $data = array_combine($header, $data);
-                $counter++;
-
-                if (!isset($data['source_path'], $data['target'], $data['target_statuscode'])) {
-                    $this->addFlashMessage('Daten konnten nicht importiert werden CSV Datei ist fehlerhaft', 'Fehlerhafte Datei', ContextualFeedbackSeverity::ERROR);
-                    break;
-                }
-
-                if ($this->findRedirect($data['source_path'])) {
-                    $ignoreCounter++;
-                    continue;
-                }
-
-
-                if (!in_array((int)$data['target_statuscode'], self::ALLOWED_STATUS_CODES, true)) {
-                    $data['target_statuscode'] = 308;
-                } else {
-                    $data['target_statuscode'] = (int)$data['target_statuscode'];
-                }
-
-                $data['source_host'] = '*';
-                $data['pid'] = '0';
-
-                $healthCheckService = GeneralUtility::makeInstance(HealthCheckService::class);
-                $page = $healthCheckService->getPageIdFromPath($data['target']);
-                if ($page && is_array($page) && array_key_exists('uid', $page)) {
-                    $linkHandler = GeneralUtility::makeInstance(PageLinkHandler::class);
-                    $url = $linkHandler->asString(['pageuid' => $page['uid']]);
-                    if ($url) {
-                        $data['target'] = $url;
-                    }
-                }
-
-                $redirect['sys_redirect']['NEW9823be87'] = $data;
-                $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-                $dataHandler->start($redirect, []);
-                $dataHandler->process_datamap();
-                $imported++;
-
-            }
+        foreach ($result['messages'] as $flashMessage) {
+            $this->addFlashMessage($flashMessage['message'], $flashMessage['title'], $flashMessage['severity']);
         }
-
 
         $view->assignMultiple([
-            'counter' => $counter,
-            'imported' => $imported,
-            'ignoreCounter' => $ignoreCounter
+            'counter' => $result['counter'],
+            'imported' => $result['imported'],
+            'ignoreCounter' => $result['ignoreCounter'],
         ]);
-
-    }
-
-    protected function findRedirect(string $sourcePath): bool
-    {
-        $queryBuilder = $this->getQueryBuilder();
-        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-        $result = $queryBuilder
-            ->select('*')
-            ->from('sys_redirect')
-            ->where(
-                $queryBuilder->expr()->eq('source_path', $queryBuilder->createNamedParameter($sourcePath)),
-            )->executeQuery();
-
-        if (!$result instanceof Result) {
-            return false;
-        }
-
-        if ($result->fetchAllAssociative()) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
      * Create document header buttons
+     *
+     * TYPO3 13.4's core declares (ModuleTemplate $view, string $requestUri), 14.x only ($view).
+     * The optional second parameter keeps this override compatible with both; the extra
+     * argument is simply ignored by the 14.x parent.
      */
-    protected function registerDocHeaderButtons(ModuleTemplate $view, string $requestUri): void
+    protected function registerDocHeaderButtons(ModuleTemplate $view, string $requestUri = ''): void
     {
+        // The 14.x parent takes one argument, the 13.4 one requires the second.
+        // @phpstan-ignore arguments.count
         parent::registerDocHeaderButtons($view, $requestUri);
-
 
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
         $buttonBar = $view->getDocHeaderComponent()->getButtonBar();
+        $moduleRoute = $this->redirectsModuleRouteIdentifier();
 
         // Import
-        $newRecordButton = $buttonBar->makeLinkButton()
-            ->setHref((string)$uriBuilder->buildUriFromRoute(
+        $importButton = $this->createLinkButton($buttonBar)
+            ->setHref((string) $uriBuilder->buildUriFromRoute(
                 'record_import',
                 [
                     'edit' => ['sys_redirect' => ['import'],
                     ],
-                    'returnUrl' => (string)$uriBuilder->buildUriFromRoute('site_redirects'),
+                    'returnUrl' => (string) $uriBuilder->buildUriFromRoute($moduleRoute),
                 ]
             ))
-            ->setTitle('Import redirect')
+            ->setTitle($this->getLanguageService()->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:button.import'))
             ->setShowLabelText(true)
-            ->setIcon($this->iconFactory->getIcon('actions-add', Icon::SIZE_SMALL));
-        $buttonBar->addButton($newRecordButton, ButtonBar::BUTTON_POSITION_LEFT, 10);
+            ->setIcon($this->iconFactory->getIcon('actions-add', IconSize::SMALL));
+        $buttonBar->addButton($importButton, ButtonBar::BUTTON_POSITION_LEFT, 10);
 
         // Disable log
-        $logButton = $buttonBar->makeLinkButton()
-            ->setHref((string)$uriBuilder->buildUriFromRoute('redirect_disable_log'))
-            ->setTitle('Deaktivierungs-Logs')
+        $logButton = $this->createLinkButton($buttonBar)
+            ->setHref((string) $uriBuilder->buildUriFromRoute('redirect_disable_log'))
+            ->setTitle($this->getLanguageService()->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:button.disableLog'))
             ->setShowLabelText(true)
-            ->setIcon($this->iconFactory->getIcon('actions-list-alternative', Icon::SIZE_SMALL));
+            ->setIcon($this->iconFactory->getIcon('actions-list-alternative', IconSize::SMALL));
         $buttonBar->addButton($logButton, ButtonBar::BUTTON_POSITION_LEFT, 10);
-
     }
 
     protected function registerDocHeaderButtonsBack(ModuleTemplate $view, string $requestUri): void
     {
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
         $buttonBar = $view->getDocHeaderComponent()->getButtonBar();
-        $closeButton = $buttonBar->makeLinkButton()
-            ->setHref((string)$uriBuilder->buildUriFromRoute('site_redirects'))
-            ->setClasses('t3js-editform-close')
-            ->setTitle($this->getLanguageService()->sL(
-                'LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:rm.closeDoc'
-            ))
-            ->setShowLabelText(true)
-            ->setIcon($this->iconFactory->getIcon('actions-close', Icon::SIZE_SMALL));
+        $closeUrl = (string) $uriBuilder->buildUriFromRoute($this->redirectsModuleRouteIdentifier());
+
+        $closeButton = $this->createCloseLinkButton($buttonBar, $closeUrl)
+            // This page (Import/Log) is itself a bare route rendered inside
+            // #typo3-contentIframe. $closeUrl is a full module URL, which always renders
+            // the whole backend shell (topbar + sidebar + its own content iframe) - loaded
+            // without target="_top" it nests a second shell inside the first instead of
+            // navigating the real top-level window. Verified against TYPO3 14; keep it.
+            ->setAttributes(['target' => '_top']);
 
         $buttonBar->addButton($closeButton, ButtonBar::BUTTON_POSITION_LEFT);
     }
 
     /**
-     * Creates a Message object and adds it to the FlashMessageQueue.
+     * TYPO3 14's core ManagementController constructor gained a ComponentFactory
+     * dependency (this class inherits whichever constructor the installed core provides,
+     * see the class-level note above) - route new buttons through it when present, since
+     * that's the current core idiom, falling back to the still-supported
+     * ButtonBar::makeLinkButton() on TYPO3 13.
+     */
+    protected function createLinkButton(ButtonBar $buttonBar): LinkButton
+    {
+        // Only ever "always true" when analysed against a TYPO3 14 install (which has
+        // this property) - on TYPO3 13 (no componentFactory) it correctly evaluates false.
+        // @phpstan-ignore function.alreadyNarrowedType, instanceof.alwaysTrue
+        if (property_exists($this, 'componentFactory') && $this->componentFactory instanceof ComponentFactory) {
+            return $this->componentFactory->createLinkButton();
+        }
+        return $buttonBar->makeLinkButton();
+    }
+
+    /**
+     * @see createLinkButton()
+     */
+    protected function createCloseLinkButton(ButtonBar $buttonBar, string $closeUrl): LinkButton
+    {
+        // @phpstan-ignore function.alreadyNarrowedType, instanceof.alwaysTrue
+        if (property_exists($this, 'componentFactory') && $this->componentFactory instanceof ComponentFactory) {
+            return $this->componentFactory->createCloseButton($closeUrl);
+        }
+        return $buttonBar->makeLinkButton()
+            ->setHref($closeUrl)
+            ->setTitle($this->getLanguageService()->sL(
+                'LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:rm.closeDoc'
+            ))
+            ->setShowLabelText(true)
+            ->setIcon($this->iconFactory->getIcon('actions-close', IconSize::SMALL));
+    }
+
+    /**
+     * TYPO3 14 renamed the core "Redirects" module identifier from `site_redirects`
+     * (parent `site`) to `redirects` (parent `link_management`), keeping `site_redirects`
+     * only as a route alias (Feature #107628) - mirrors Configuration/Backend/Modules.php,
+     * which registers this extension's override under whichever id matches, and
+     * AddFilterEventListener, which assigns the same identifier to the Overview template.
+     */
+    protected function redirectsModuleRouteIdentifier(): string
+    {
+        return (new Typo3Version())->getMajorVersion() >= 14 ? 'redirects' : 'site_redirects';
+    }
+
+    /**
+     * Creates a Message object and adds it to the FlashMessageQueue. This
+     * (non-Extbase) controller base has no addFlashMessage() of its own.
      *
-     * @param string $messageBody The message
-     * @param string $messageTitle Optional message title
-     * @param ContextualFeedbackSeverity $severity Optional severity
-     * @param bool $storeInSession Optional, defines whether the message should be stored in the session (default) or not
-     * @throws Exception
      * @see \TYPO3\CMS\Core\Messaging\FlashMessage
      */
-    public function addFlashMessage($messageBody, $messageTitle = '', ContextualFeedbackSeverity $severity = ContextualFeedbackSeverity::OK, $storeInSession = true): void
+    public function addFlashMessage(string $messageBody, string $messageTitle = '', ContextualFeedbackSeverity $severity = ContextualFeedbackSeverity::OK, bool $storeInSession = true): void
     {
-        if (!is_string($messageBody)) {
-            throw new \InvalidArgumentException('The message body must be of type string, "' . gettype($messageBody) . '" given.', 1243258395);
-        }
-        /* @var \TYPO3\CMS\Core\Messaging\FlashMessage $flashMessage */
         $flashMessage = GeneralUtility::makeInstance(
             FlashMessage::class,
-            (string)$messageBody,
-            (string)$messageTitle,
+            $messageBody,
+            $messageTitle,
             $severity,
             $storeInSession
         );
@@ -298,37 +255,5 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         $flashMessageService = GeneralUtility::makeInstance(FlashMessageService::class);
         $defaultFlashMessageQueue = $flashMessageService->getMessageQueueByIdentifier();
         $defaultFlashMessageQueue->enqueue($flashMessage);
-    }
-
-    protected function getQueryBuilder(): QueryBuilder
-    {
-        return GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_redirect');
-    }
-
-    protected function preparePagination(Demand $demand, bool $createCountQuery = false): array
-    {
-        $redirectRepository = GeneralUtility::makeInstance(RedirectRepository::class);
-        $count = $redirectRepository->countRedirectsByRbDemand($demand);
-        $numberOfPages = ceil($count / $demand->getLimit());
-        $endRecord = $demand->getOffset() + $demand->getLimit();
-        if ($endRecord > $count) {
-            $endRecord = $count;
-        }
-
-        $pagination = [
-            'current' => $demand->getPage(),
-            'numberOfPages' => $numberOfPages,
-            'hasLessPages' => $demand->getPage() > 1,
-            'hasMorePages' => $demand->getPage() < $numberOfPages,
-            'startRecord' => $demand->getOffset() + 1,
-            'endRecord' => $endRecord,
-        ];
-        if ($pagination['current'] < $pagination['numberOfPages']) {
-            $pagination['nextPage'] = $pagination['current'] + 1;
-        }
-        if ($pagination['current'] > 1) {
-            $pagination['previousPage'] = $pagination['current'] - 1;
-        }
-        return $pagination;
     }
 }

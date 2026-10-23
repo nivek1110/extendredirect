@@ -61,7 +61,9 @@ class SuppressRecordSavedNotificationMiddleware implements MiddlewareInterface
 
     protected function isSysRedirectSave(ServerRequestInterface $request): bool
     {
-        $data = $request->getParsedBody()['data'] ?? $request->getQueryParams()['data'] ?? [];
+        $parsedBody = $request->getParsedBody();
+        $parsedBody = is_array($parsedBody) ? $parsedBody : [];
+        $data = $parsedBody['data'] ?? $request->getQueryParams()['data'] ?? [];
         return is_array($data) && array_key_exists('sys_redirect', $data);
     }
 }

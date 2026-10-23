@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace TWT\TwtRedirect\Repository;
+namespace Nivek1110\Extendredirect\Repository;
 
 use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\Connection;
@@ -16,7 +16,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 class DisableLogRepository
 {
-    public const TABLE = 'tx_twtredirect_disable_log';
+    public const TABLE = 'tx_extendredirect_disable_log';
 
     /**
      * Returns all log entries, newest first.
@@ -67,7 +67,7 @@ class DisableLogRepository
     {
         $queryBuilder = $this->getQueryBuilder();
 
-        return (int)$queryBuilder
+        return (int) $queryBuilder
             ->count('uid')
             ->from(self::TABLE)
             ->executeQuery()
@@ -99,6 +99,22 @@ class DisableLogRepository
     public function deleteAll(): void
     {
         $this->getConnection()->truncate(self::TABLE);
+    }
+
+    /**
+     * Deletes all log entries created before the given timestamp.
+     *
+     * @return int number of deleted entries
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function deleteOlderThan(int $timestamp): int
+    {
+        $queryBuilder = $this->getQueryBuilder();
+
+        return (int) $queryBuilder
+            ->delete(self::TABLE)
+            ->where($queryBuilder->expr()->lt('crdate', $queryBuilder->createNamedParameter($timestamp, ParameterType::INTEGER)))
+            ->executeStatement();
     }
 
     protected function getConnection(): Connection

@@ -1,13 +1,14 @@
 <?php
 
-namespace TWT\TwtRedirect\Command;
+namespace Nivek1110\Extendredirect\Command;
 
 use Doctrine\DBAL\Exception;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use TWT\TwtRedirect\Service\HealthCheckService;
+use Nivek1110\Extendredirect\Service\HealthCheckService;
 
 class CheckCommand extends Command
 {
@@ -18,8 +19,11 @@ class CheckCommand extends Command
      */
     protected function configure(): void
     {
-        $this->setName('Check Redirects');
-        $this->setDescription('Check Redirects and disable wrong Redirects');
+        $this->setDescription('Check all redirects and disable broken ones');
+        $this->addOption('dry-run', null, InputOption::VALUE_NONE, 'Only report which redirects would be disabled, change nothing');
+        $this->addOption('delay', null, InputOption::VALUE_REQUIRED, 'Pause in milliseconds after each checked redirect (rate limit)', '0');
+        $this->addOption('max-runtime', null, InputOption::VALUE_REQUIRED, 'Stop starting new checks after this many seconds (0 = no limit)', '0');
+        $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Check at most this many redirects per run, least recently checked first (0 = all)', '0');
     }
 
     /**
@@ -46,9 +50,43 @@ class CheckCommand extends Command
     {
         $this->io = new SymfonyStyle($input, $output);
 
-        $this->healthCheckService->runHealthCheck();
+        $options = [];
+        foreach (['delay', 'max-runtime', 'limit'] as $name) {
+            $value = filter_var($input->getOption($name), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+            if ($value === false) {
+                $this->io->error(sprintf('The "%s" option must be an integer of 0 or greater.', $name));
 
-        return 0;
+                return Command::FAILURE;
+            }
+            $options[$name] = $value;
+        }
+
+        $dryRun = (bool) $input->getOption('dry-run');
+        $result = $this->healthCheckService->runBulkCheck($dryRun, $options['delay'], $options['max-runtime'], $options['limit']);
+
+        if ($dryRun) {
+            $this->io->note('Dry run: nothing was changed.');
+        }
+        foreach ($result['broken'] as $broken) {
+            $this->io->writeln(sprintf(
+                '%s redirect #%d (%s): %s',
+                $dryRun ? 'Would disable' : 'Disabled',
+                $broken['uid'],
+                $broken['source'],
+                $broken['message']
+            ));
+        }
+        $this->io->success(sprintf(
+            'Checked %d redirects, %d broken, %d skipped (disabled by hand).',
+            $result['checked'],
+            count($result['broken']),
+            $result['skipped']
+        ));
+        if ($result['remaining'] > 0) {
+            $this->io->warning(sprintf('Run stopped early (limit or max runtime): %d redirects were not checked.', $result['remaining']));
+        }
+
+        return Command::SUCCESS;
     }
 
     /**
