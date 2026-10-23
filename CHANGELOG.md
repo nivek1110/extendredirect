@@ -3,41 +3,32 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
 ## [1.0.0] - 2026-10-23
 
-First release: health check (`request`/`database` mode), self-healing targets, page delete/hide guard,
-broken-redirect filter, disable log, CSV import and the CLI/Scheduler commands. For TYPO3 13.4 LTS and 14.3 LTS.
+First release. Makes TYPO3's Redirects module self-maintaining.
 
-### Added
-- `extendredirect:cleanuplog` command (schedulable): deletes disable log entries older than `--days` (default 30).
-- `extendredirect:checkredirects` options: `--dry-run`, `--delay=<ms>`, `--max-runtime=<s>`, `--limit=<n>`.
-- `sys_redirect.last_checked`: bulk runs process never-checked and least recently checked redirects first.
-- Descriptions for both commands in the Scheduler; command labels in `locallang.xlf`/`de.locallang.xlf`.
-- TCA for the disable log table; index on its `crdate` column.
-- Functional tests for `HealthCheckService` (both check modes), `cleanuplog`, multi-site CSV import and
-  `ManagementController` import/log rendering; `Documentation/` and this changelog.
+### Features
+- **Health check** of every redirect target, either by following it through a frontend request (`request` mode,
+  default) or purely against the `pages`/`sys_redirect` tables (`database` mode). Broken redirects are disabled.
+- **Self-healing targets**: page targets are rewritten to `t3://page?uid=…`, redirect chains (up to 10 hops) are
+  flattened to the final page.
+- **Re-check on every edit**: changing a redirect's target re-enables and re-checks it.
+- **Page delete/hide protection**: redirects pointing to a deleted or hidden page are disabled with a logged reason.
+- **Broken-redirect filter** in the Redirects module.
+- **Disable log** with reason, source, target and timestamp.
+- **CSV import** with validation (unknown source hosts, duplicate source paths per host).
+- **Commands**, both usable from the Scheduler:
+  - `extendredirect:checkredirects` with `--dry-run`, `--delay=<ms>`, `--max-runtime=<s>` and `--limit=<n>`.
+    Never-checked and least recently checked redirects come first; redirects you disabled by hand are never
+    re-enabled.
+  - `extendredirect:cleanuplog --days=<n>` deletes disable log entries older than n days (default 30).
 
-### Fixed
-- Saving a redirect in the backend logged the editor out in `request` check mode: the frontend sub-request reset the
-  shared `backend.user` context aspect, so the backend middleware deleted the session cookie. The check now restores
-  `$GLOBALS['BE_USER']`, `$GLOBALS['TYPO3_REQUEST']` and the context aspects it clobbers.
-- A new redirect whose uid could not be resolved after saving made the save hook check every redirect.
-- Fatal errors on TYPO3 13.4 (the extension only loaded on 14.x): `ManagementController::registerDocHeaderButtons()`
-  and the `RedirectDemand` constructor now match the core signatures of both majors (14.x added `redirectType`).
-- Disable log and import page crashed on TYPO3 13.4 (`LinkButton::setAttributes()` only exists in 14.x); the
-  `target="_top"` of the close button is now only set where the button supports it.
-- DDEV testbed: the per-version demo instances (`ddev install-v13|v14`) lacked `helhum/typo3-console`.
-- CSV import skipped a row when the same `source_path` existed on a different host; duplicates are now
-  detected per host (a wildcard `*` redirect still counts for every host).
-- TYPO3 14.3 deprecation for `ext_emconf.php`: `composer.json` now declares `extra.typo3/cms.version` and
-  `Package.providesPackages` (`ext_emconf.php` stays for TER; keep both versions in sync).
-- A bulk health check re-enabled redirects that an editor had disabled by hand.
-- `broken_redirect` was never registered in the TCA of `sys_redirect`.
-- 22 missing German translations.
-- Missing extension metadata (`description`, `author`, `state`) in `composer.json` and `ext_emconf.php`.
+### Requirements
+- PHP 8.3 or newer
+- TYPO3 13.4 LTS or 14.3 LTS
 
-### Changed
-- Removed `ext_tables.sql`: all columns (`sys_redirect.broken_redirect`, `redirect_count`, `last_checked` and the
-  disable log table) are derived from TCA by the TYPO3 13+ core. Run "Analyze Database Structure" after updating.
-  `redirect_count` now defaults to an empty string instead of `'0'`; the log's `source_path`/`target` become `TEXT`.
-- `CheckCommand` no longer sets a conflicting command name; the name comes from `Services.yaml`.
+### Installation
+Install the extension, then run *Admin Tools → Maintenance → Analyze Database Structure* to create the new
+columns and the log table. See the README for configuration (`checkMode`) and usage.
