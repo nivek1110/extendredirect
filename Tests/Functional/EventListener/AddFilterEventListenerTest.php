@@ -14,7 +14,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 class AddFilterEventListenerTest extends FunctionalTestCase
 {
-    protected array $coreExtensionsToLoad = ['redirects'];
+    protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
     /**

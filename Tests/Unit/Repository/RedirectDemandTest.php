@@ -97,4 +97,19 @@ class RedirectDemandTest extends TestCase
             'broken_redirect' => 1,
         ], $demand->getParameters());
     }
+
+    /**
+     * TYPO3 14's core Demand takes a "redirectType" argument (and defines DEFAULT_REDIRECT_TYPE), 13.4's
+     * has neither. Our constructor must not take it itself; it passes it to the parent only where the parent expects it.
+     */
+    public function testConstructorDoesNotDependOnCoreOnlyRedirectTypeParameter(): void
+    {
+        $parameterNames = array_map(
+            static fn(\ReflectionParameter $parameter): string => $parameter->getName(),
+            (new \ReflectionMethod(RedirectDemand::class, '__construct'))->getParameters()
+        );
+
+        self::assertNotContains('redirectType', $parameterNames);
+        self::assertContains('brokenRedirect', $parameterNames);
+    }
 }

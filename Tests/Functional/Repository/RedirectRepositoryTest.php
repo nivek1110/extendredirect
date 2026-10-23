@@ -11,7 +11,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 class RedirectRepositoryTest extends FunctionalTestCase
 {
-    protected array $coreExtensionsToLoad = ['redirects'];
+    protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
     private RedirectRepository $subject;
@@ -192,5 +192,52 @@ class RedirectRepositoryTest extends FunctionalTestCase
 
         self::assertCount(1, $result);
         self::assertSame(1, (int) $result[0]['broken_redirect']);
+    }
+
+    public function testUpdateHealthCheckResultStampsLastChecked(): void
+    {
+        $uid = $this->insertRedirect();
+        $before = $this->subject->findByUid($uid);
+        self::assertIsArray($before);
+        self::assertSame(0, (int) $before['last_checked']);
+
+        $this->subject->updateHealthCheckResult($uid, false, 0, '/bar');
+
+        $after = $this->subject->findByUid($uid);
+        self::assertIsArray($after);
+        self::assertGreaterThan(0, (int) $after['last_checked']);
+    }
+
+    public function testFindAllReturnsNeverCheckedFirstThenOldestChecked(): void
+    {
+        $recent = $this->insertRedirect(['source_path' => '/recent', 'last_checked' => 2000]);
+        $never = $this->insertRedirect(['source_path' => '/never', 'last_checked' => 0]);
+        $old = $this->insertRedirect(['source_path' => '/old', 'last_checked' => 1000]);
+
+        $uids = array_map(static fn(array $row): int => (int) $row['uid'], $this->subject->findAll());
+
+        self::assertSame([$never, $old, $recent], $uids);
+    }
+
+    public function testExistsBySourcePathWithHostIgnoresOtherHosts(): void
+    {
+        $this->insertRedirect(['source_host' => 'a.example.com', 'source_path' => '/old']);
+
+        self::assertTrue($this->subject->existsBySourcePath('/old', 'a.example.com'));
+        self::assertFalse($this->subject->existsBySourcePath('/old', 'b.example.com'));
+    }
+
+    public function testExistsBySourcePathWithHostCountsWildcardRedirects(): void
+    {
+        $this->insertRedirect(['source_host' => '*', 'source_path' => '/old']);
+
+        self::assertTrue($this->subject->existsBySourcePath('/old', 'a.example.com'));
+    }
+
+    public function testExistsBySourcePathForWildcardHostMatchesAnyHost(): void
+    {
+        $this->insertRedirect(['source_host' => 'a.example.com', 'source_path' => '/old']);
+
+        self::assertTrue($this->subject->existsBySourcePath('/old', '*'));
     }
 }

@@ -13,7 +13,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 class RedirectCsvImportServiceTest extends FunctionalTestCase
 {
-    protected array $coreExtensionsToLoad = ['redirects'];
+    protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
     private RedirectCsvImportService $subject;
@@ -174,5 +174,87 @@ class RedirectCsvImportServiceTest extends FunctionalTestCase
 
         self::assertSame(0, $result['imported']);
         self::assertNotEmpty($result['messages']);
+    }
+
+    private function insertSecondSite(): void
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('pages');
+        $connection->insert('pages', ['pid' => 0, 'title' => 'Root 2', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        GeneralUtility::makeInstance(SiteWriter::class)
+            ->createNewBasicSite('second', (int) $connection->lastInsertId(), 'https://other.example.org/');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function importedRedirects(): array
+    {
+        return GeneralUtility::makeInstance(RedirectRepository::class)->findAll();
+    }
+
+    public function testSameSourcePathOnDifferentHostsIsImportedForBoth(): void
+    {
+        $this->insertRootPageWithSite();
+        $this->insertSecondSite();
+
+        $this->writeCsv(
+            "source_host;source_path;target;target_statuscode\n"
+            . "example.com;/old;/a;301\n"
+            . "other.example.org;/old;/b;301\n"
+        );
+
+        $result = $this->subject->importFromCsvFile($this->csvPath);
+
+        self::assertSame(2, $result['imported']);
+        self::assertSame(0, $result['ignoreCounter']);
+        self::assertCount(2, $this->importedRedirects());
+    }
+
+    public function testSameSourcePathTwiceOnSameHostSkipsTheSecondRow(): void
+    {
+        $this->insertRootPageWithSite();
+
+        $this->writeCsv(
+            "source_host;source_path;target;target_statuscode\n"
+            . "example.com;/old;/a;301\n"
+            . "example.com;/old;/b;301\n"
+        );
+
+        $result = $this->subject->importFromCsvFile($this->csvPath);
+
+        self::assertSame(1, $result['imported']);
+        self::assertSame(1, $result['ignoreCounter']);
+    }
+
+    public function testWildcardHostRowBlocksTheSamePathOnASpecificHost(): void
+    {
+        $this->insertRootPageWithSite();
+
+        $this->writeCsv(
+            "source_host;source_path;target;target_statuscode\n"
+            . "*;/old;/a;301\n"
+            . "example.com;/old;/b;301\n"
+        );
+
+        $result = $this->subject->importFromCsvFile($this->csvPath);
+
+        self::assertSame(1, $result['imported']);
+        self::assertSame(1, $result['ignoreCounter']);
+    }
+
+    public function testOptionalBooleanColumnsAreEnabledByAnyValueAndSkippedWhenEmpty(): void
+    {
+        $this->insertRootPageWithSite();
+
+        $this->writeCsv(
+            "source_host;source_path;target;target_statuscode;force_https;keep_query_parameters\n"
+            . "example.com;/old;/somewhere-external;301;1;\n"
+        );
+
+        $this->subject->importFromCsvFile($this->csvPath);
+
+        $redirect = $this->importedRedirects()[0];
+        self::assertSame(1, (int) $redirect['force_https']);
+        self::assertSame(0, (int) $redirect['keep_query_parameters']);
     }
 }

@@ -17,6 +17,9 @@ class HealthCheckServiceTest extends TestCase
         return new HealthCheckService($extensionConfiguration, $siteFinder);
     }
 
+    /**
+     * @return array<string, Site>
+     */
     private function createSites(): array
     {
         return [
@@ -25,6 +28,9 @@ class HealthCheckServiceTest extends TestCase
         ];
     }
 
+    /**
+     * @return Site[]
+     */
     private function invokeFindSitesBySourceHost(HealthCheckService $service, string $sourceHost): array
     {
         $method = new \ReflectionMethod($service, 'findSitesBySourceHost');

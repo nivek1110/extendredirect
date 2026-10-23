@@ -61,4 +61,19 @@ class ManagementControllerTest extends TestCase
         $expected = (new Typo3Version())->getMajorVersion() >= 14 ? 'redirects' : 'site_redirects';
         self::assertSame($expected, $result);
     }
+
+    /**
+     * TYPO3 13.4's core declares registerDocHeaderButtons(ModuleTemplate, string $requestUri), 14.x only
+     * (ModuleTemplate). The override must accept the optional second argument so it stays signature-
+     * compatible with both - a mismatch is a fatal error at class load time on the other major.
+     */
+    public function testRegisterDocHeaderButtonsStaysSignatureCompatibleWithTypo3Thirteen(): void
+    {
+        $method = new \ReflectionMethod(ManagementController::class, 'registerDocHeaderButtons');
+
+        self::assertSame(1, $method->getNumberOfRequiredParameters());
+        self::assertSame(2, $method->getNumberOfParameters());
+        self::assertSame('requestUri', $method->getParameters()[1]->getName());
+        self::assertTrue($method->getParameters()[1]->isOptional());
+    }
 }

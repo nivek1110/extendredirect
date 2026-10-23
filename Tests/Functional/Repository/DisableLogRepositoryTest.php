@@ -10,7 +10,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 class DisableLogRepositoryTest extends FunctionalTestCase
 {
-    protected array $coreExtensionsToLoad = ['redirects'];
+    protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
     private DisableLogRepository $subject;
@@ -101,5 +101,21 @@ class DisableLogRepositoryTest extends FunctionalTestCase
         $this->subject->deleteAll();
 
         self::assertSame(0, $this->subject->countAll());
+    }
+
+    public function testDeleteOlderThanRemovesOnlyEntriesBeforeTimestamp(): void
+    {
+        $this->subject->add($this->logEntry(['crdate' => 100, 'redirect_uid' => 1]));
+        $this->subject->add($this->logEntry(['crdate' => 200, 'redirect_uid' => 2]));
+        $this->subject->add($this->logEntry(['crdate' => 300, 'redirect_uid' => 3]));
+
+        $deleted = $this->subject->deleteOlderThan(200);
+
+        self::assertSame(1, $deleted);
+        $remaining = array_map(
+            static fn(array $row): int => (int) $row['redirect_uid'],
+            $this->subject->findAll()
+        );
+        self::assertSame([3, 2], $remaining);
     }
 }
