@@ -1,21 +1,102 @@
-# Extendredirect
+# TYPO3 Extension `extendredirect`
 
-TODO: describe what this TYPO3 extension does.
+## Introduction
+
+### What does it do?
+
+`extendredirect` turns TYPO3's built-in redirects module into a self-maintaining system. Instead of
+redirects silently rotting once their target moves or disappears, this extension watches them,
+disables the ones that break, straightens out the ones that don't have to be broken, and gives
+editors a clear audit trail of what happened and why — directly in the existing "Redirects" backend
+module, no new UI to learn.
+
+### Why you'd want this
+
+Redirects normally just sit in the database until someone notices a 404 report and goes digging.
+`extendredirect` catches that automatically: broken targets get disabled the moment they're detected
+(on save, and in bulk via a scheduled check), so dead links stop reaching visitors instead of piling
+up unnoticed.
+
+## Features
+
+- **Automatic health check** — every redirect's target is verified: followed live over HTTP like a
+  browser would, or resolved purely against the `pages`/`sys_redirect` tables without firing a single
+  request (your choice, see [Configuration](#configuration)). Redirects whose target no longer
+  resolves are disabled automatically.
+- **Self-healing targets** — a target that resolves to a TYPO3 page is rewritten to the canonical
+  `t3://page?uid=…` link, and a chain of several redirects hopping to each other (up to 10 hops) is
+  flattened straight to the final page, so it isn't repeatedly re-checked.
+- **Re-checked on every edit** — the moment you change a redirect's target, it's automatically
+  re-enabled and health-checked again, so a fix is confirmed working immediately instead of waiting
+  for the next scheduled run.
+- **Page delete/hide protection** — deleting or hiding a page automatically disables every redirect
+  that pointed at it, with a logged reason, instead of leaving them dangling.
+- **Broken-redirect filter** — the Redirects module's filter bar gains a "broken redirect" option, so
+  you can list exactly the redirects that need attention.
+- **Disable log** — a dedicated log view lists every redirect the health check (or the page-guard)
+  has disabled, with the reason, source, target and timestamp — so nothing gets disabled silently.
+  Entries can be deleted individually or all at once.
+- **CSV import** — bulk-import redirects from a semicolon-separated CSV file straight from the
+  module's toolbar, with built-in validation: unknown source hosts and duplicate source paths are
+  rejected/skipped and reported back, and page-resolving targets are converted to canonical page
+  links on the way in.
+- **CLI / Scheduler command** — `extendredirect:checkredirects` runs the health check over every
+  redirect in bulk, so you can schedule it via TYPO3's Scheduler or cron instead of relying purely on
+  the on-edit check.
+  Options: `--dry-run` only reports which redirects would be disabled and changes nothing;
+  `--delay=<ms>` pauses after each checked redirect (rate limit for `request` mode);
+  `--max-runtime=<seconds>` stops starting new checks once the budget is used up and reports how
+  many redirects were left unchecked; `--limit=<n>` checks at most n redirects per run. Redirects are
+  processed never-checked first, then least recently checked (`last_checked`), so limited runs rotate
+  through all of them. Redirects you disabled by hand are never re-enabled.
+- **Disable log cleanup** — `extendredirect:cleanuplog --days=30` deletes disable log entries older
+  than the given number of days (default 30). Schedulable like the core "Table garbage collection"
+  task; the `days` option becomes a field in the Scheduler task form.
+- **No duplicate/confusing notifications** — the generic "Record saved" toast is suppressed on
+  `sys_redirect` saves so it doesn't contradict the health-check's own outcome message (e.g.
+  "Redirect disabled").
+
+## Installation
+
+### Composer
+
+```
+composer require nivek1110/extendredirect
+```
+
+### TER
+
+Alternatively, download the extension from the
+[TYPO3 Extension Repository](https://extensions.typo3.org/extension/extendredirect) and install it
+via the Extension Manager.
+
+## Configuration
+
+Extension configuration (Admin Tools → Settings → Extension Configuration → `extendredirect`):
+
+| Setting     | Type    | Description                                                                                                     |
+|-------------|---------|-------------------------------------------------------------------------------------------------------------------|
+| `checkMode` | options | `request` (default): follow the redirect live over HTTP, like a browser. `database`: resolve directly against the `pages`/`sys_redirect` tables without firing any request. |
+
+> **`request` mode needs a working site base URL.** The check builds the URL to follow from each
+> site's configured base (Site Configuration → Base). Without a reachable, correctly configured base
+> URL there's nothing to request, and the health check can't verify anything — use `database` mode
+> instead if your site isn't reachable over HTTP (e.g. local/offline environments).
+
+## Usage
+
+Open the **Redirects** backend module (Link Management → Redirects) as usual — it now includes the
+broken-redirect filter, CSV import and disable log. To run the health check in bulk, schedule the
+`Check Redirects` command via the TYPO3 Scheduler, or run it manually:
+
+```
+vendor/bin/typo3 extendredirect:checkredirects
+```
 
 ## Requirements
 
 - PHP **8.3+**
 - TYPO3 **13.4 LTS** or **14.3 LTS**
-
-## Installation
-
-```bash
-composer require nivek1110/extendredirect
-```
-
-## Usage
-
-TODO.
 
 ## Contributing
 
@@ -29,4 +110,4 @@ ddev test all && ddev lint
 
 ## License
 
-GPL-2.0-or-later.
+This extension is released under the [GNU General Public License 2.0 (or later)](LICENSE).

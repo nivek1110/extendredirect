@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This is a TYPO3 extension, **`nivek1110/extendredirect`** (TER key `extendredirect`, PHP namespace
-`Nivek1110\Extendredirect\`). Fresh scaffold, ported over from an earlier extension's DDEV testbed —
-`Classes/`, `Configuration/`, `Resources/`, `Tests/` are currently empty. TODO: fill in what this
-extension does and update this section (and README.md) once scope is decided.
+TYPO3 extension **`nivek1110/extendredirect`** (TER key `extendredirect`, PHP namespace
+`Nivek1110\Extendredirect\`). It makes TYPO3's core Redirects module self-maintaining: health check of
+redirect targets, auto-disabling of broken redirects, page delete/hide guard, CSV import, a disable log
+and two schedulable CLI commands. User-facing docs: `README.md` and `Documentation/`; release notes:
+`CHANGELOG.md` (keep it updated with every user-visible change).
 
 ## How to work in this repo
 
@@ -58,8 +59,34 @@ Tests split into two suites by what they need to boot:
 
 ## Architecture
 
-TODO: document data flow, key abstractions, and any locked design decisions once the extension's
-scope is defined.
+Entry points -> services -> repositories:
+
+- `Hooks/DataHandlerHook` (registered in `ext_localconf.php`, legacy DataHandler hooks - no PSR-14 equivalent for
+  page delete) only routes events: `sys_redirect` save -> `HealthCheckService::runHealthCheckForSavedRecord()`;
+  page delete/hide -> `PageRedirectGuardService`.
+- `Service/HealthCheckService` - core logic. Two modes via ext conf `checkMode`: `request` follows the source URL
+  through an in-process frontend sub-request (`redirectFollower()`), `database` resolves purely against
+  `pages`/`sys_redirect` (follows chains up to `MAX_CHAIN_HOPS`, flattens them, rewrites targets to
+  `t3://page?uid=`). `runBulkCheck()` is the bulk entry (dry-run, delay, max-runtime, limit).
+- `Command/CheckCommand` (`extendredirect:checkredirects`) and `Command/CleanupLogCommand`
+  (`extendredirect:cleanuplog`) - both schedulable, registered with description in `Configuration/Services.yaml`.
+- `Controller/ManagementController` + `Resources/Private/Templates/Management/` extend the core Redirects module
+  (overview, log, CSV import); `EventListener/AddFilterEventListener` adds the broken-redirect filter;
+  `Middleware/SuppressRecordSavedNotificationMiddleware` hides the generic "Record saved" toast.
+- `Repository/RedirectRepository`, `DisableLogRepository`, `RedirectDemand` - all DB access (QueryBuilder).
+
+Locked decisions:
+- Redirects disabled by hand (`disabled=1`, `broken_redirect=0`) are never re-enabled by a bulk run; only our own
+  (`broken_redirect=1`) are, once healthy.
+- `sys_redirect.redirect_count` is a `varchar` on purpose (stores `'-'` on errors).
+- Bulk runs order by `sys_redirect.last_checked` (never-checked first) so `--limit`/`--max-runtime` rotate.
+- No real per-request timeout/parallelism: checks are in-process sub-requests sharing global state.
+- Version lives in `ext_emconf.php` AND `composer.json` (`extra.typo3/cms.version`, needed to avoid the TYPO3 14.3
+  `ext_emconf.php` deprecation) - keep both in sync on release; `ext_emconf.php` stays for TER.
+- No `ext_tables.sql`: since TYPO3 13 the core derives DB columns from TCA (`DefaultTcaSchema`), so every column of
+  `sys_redirect` (ours) and the log table is declared in TCA with an auto-creating type (`check`, `input`, `number`,
+  `text`, `datetime` - NOT `passthrough`). Trade-off: no custom indexes on the log table.
+- Disable log table `tx_extendredirect_disable_log` has a hidden, admin-only TCA; retention via `cleanuplog`.
 
 Supported floor is **PHP 8.3 / TYPO3 13.4**, test matrix PHP 8.3/8.4/8.5 and TYPO3 13.4 + 14.x. Keep
 code dual-version-clean (no APIs exclusive to one major without a guard/adapter).

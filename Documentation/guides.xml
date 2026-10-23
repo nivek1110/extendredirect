@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<guides
+    xmlns="https://www.phpdoc.org/guides"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://www.phpdoc.org/guides vendor/phpdocumentor/guides-cli/resources/schema/guides.xsd"
+    links-are-relative="true"
+>
+    <extension
+        class="\T3Docs\Typo3DocsTheme\DependencyInjection\Typo3DocsThemeExtension"
+        project-home="https://github.com/nivek1110/extendredirect"
+        project-repository="https://github.com/nivek1110/extendredirect"
+        project-issues="https://github.com/nivek1110/extendredirect/issues"
+        edit-on-github-branch="main"
+        edit-on-github="nivek1110/extendredirect"
+        typo3-core-preferred="13.4"
+    />
+    <project title="Extend Redirect" release="1.0.0" version="1.0" copyright="since 2026 by Kevin Rüdger"/>
+</guides>
