@@ -40,8 +40,13 @@ class DataHandlerHook
         }
 
         if ($table === 'sys_redirect' && $status === 'new') {
-            GeneralUtility::makeInstance(HealthCheckService::class)
-                ->runHealthCheckForSavedRecord((int) $dataHandler->substNEWwithIDs[$id], $dataHandler);
+            // Without a substituted uid there is no record to check - and findByUid(0) returning
+            // false would make the health check fall back to checking every redirect.
+            $newUid = (int) ($dataHandler->substNEWwithIDs[(string) $id] ?? 0);
+            if ($newUid > 0) {
+                GeneralUtility::makeInstance(HealthCheckService::class)
+                    ->runHealthCheckForSavedRecord($newUid, $dataHandler);
+            }
         }
 
         if ($table === 'pages' && $status === 'update' && array_key_exists('hidden', $fieldArray) && (int) $fieldArray['hidden'] === 1) {

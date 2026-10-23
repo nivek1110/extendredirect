@@ -34,6 +34,17 @@ class AddFilterEventListenerTest extends FunctionalTestCase
         return (int) $connection->lastInsertId();
     }
 
+    private function eventConstructorHasParameter(string $name): bool
+    {
+        foreach ((new \ReflectionMethod(ModifyRedirectManagementControllerViewDataEvent::class, '__construct'))->getParameters() as $parameter) {
+            if ($parameter->getName() === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function testPopulatesRedirectsAndDemandFromTheRequestAndAssignsModuleRoute(): void
     {
         $matching = $this->insertRedirect(['source_path' => '/match-me']);
@@ -47,17 +58,22 @@ class AddFilterEventListenerTest extends FunctionalTestCase
         $expectedModuleRoute = (new Typo3Version())->getMajorVersion() >= 14 ? 'redirects' : 'site_redirects';
         $view->expects(self::once())->method('assign')->with('moduleRoute', $expectedModuleRoute);
 
-        $event = new ModifyRedirectManagementControllerViewDataEvent(
-            demand: new RedirectDemand(),
-            redirects: [],
-            hosts: [],
-            statusCodes: [],
-            creationTypes: [],
-            showHitCounter: false,
-            view: $view,
-            request: $request,
-            integrityStatusCodes: [],
-        );
+        $arguments = [
+            'demand' => new RedirectDemand(),
+            'redirects' => [],
+            'hosts' => [],
+            'statusCodes' => [],
+            'creationTypes' => [],
+            'showHitCounter' => false,
+            'view' => $view,
+            'request' => $request,
+            'integrityStatusCodes' => [],
+        ];
+        // TYPO3 14.3.10 added a required "creators" argument that 13.4 does not know.
+        if ($this->eventConstructorHasParameter('creators')) {
+            $arguments['creators'] = [];
+        }
+        $event = new ModifyRedirectManagementControllerViewDataEvent(...$arguments);
 
         (new AddFilterEventListener())($event);
 

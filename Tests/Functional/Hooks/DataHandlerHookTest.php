@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nivek1110\Extendredirect\Tests\Functional\Hooks;
 
+use Nivek1110\Extendredirect\Hooks\DataHandlerHook;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
@@ -167,5 +168,16 @@ class DataHandlerHookTest extends FunctionalTestCase
         $result = $this->redirectRepository->findByUid($uid);
         self::assertIsArray($result);
         self::assertSame(1, (int) $result['disabled']);
+    }
+
+    public function testNewRedirectWithoutResolvedUidSkipsTheHealthCheck(): void
+    {
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], []);
+
+        // No NEW... placeholder was ever substituted (e.g. the insert failed), so there is no uid to check.
+        (new DataHandlerHook())->processDatamap_afterDatabaseOperations('new', 'sys_redirect', 'NEW123', [], $dataHandler);
+
+        self::assertSame([], $this->redirectRepository->findAll());
     }
 }

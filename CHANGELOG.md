@@ -18,6 +18,7 @@ broken-redirect filter, disable log, CSV import and the CLI/Scheduler commands. 
   `ManagementController` import/log rendering; `Documentation/` and this changelog.
 
 ### Fixed
+- A new redirect whose uid could not be resolved after saving made the save hook check every redirect.
 - Fatal errors on TYPO3 13.4 (the extension only loaded on 14.x): `ManagementController::registerDocHeaderButtons()`
   and the `RedirectDemand` constructor now match the core signatures of both majors (14.x added `redirectType`).
 - Disable log and import page crashed on TYPO3 13.4 (`LinkButton::setAttributes()` only exists in 14.x); the
