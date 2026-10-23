@@ -17,6 +17,8 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 - Fatal errors on TYPO3 13.4 (the extension only loaded on 14.x): `ManagementController::registerDocHeaderButtons()`
   and the `RedirectDemand` constructor now match the core signatures of both majors (14.x added `redirectType`).
+- Disable log and import page crashed on TYPO3 13.4 (`LinkButton::setAttributes()` only exists in 14.x); the
+  `target="_top"` of the close button is now only set where the button supports it.
 - DDEV testbed: the per-version demo instances (`ddev install-v13|v14`) lacked `helhum/typo3-console`.
 - CSV import skipped a row when the same `source_path` existed on a different host; duplicates are now
   detected per host (a wildcard `*` redirect still counts for every host).

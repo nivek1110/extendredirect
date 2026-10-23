@@ -177,13 +177,18 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         $buttonBar = $view->getDocHeaderComponent()->getButtonBar();
         $closeUrl = (string) $uriBuilder->buildUriFromRoute($this->redirectsModuleRouteIdentifier());
 
-        $closeButton = $this->createCloseLinkButton($buttonBar, $closeUrl)
-            // This page (Import/Log) is itself a bare route rendered inside
-            // #typo3-contentIframe. $closeUrl is a full module URL, which always renders
-            // the whole backend shell (topbar + sidebar + its own content iframe) - loaded
-            // without target="_top" it nests a second shell inside the first instead of
-            // navigating the real top-level window. Verified against TYPO3 14; keep it.
-            ->setAttributes(['target' => '_top']);
+        $closeButton = $this->createCloseLinkButton($buttonBar, $closeUrl);
+        // This page (Import/Log) is itself a bare route rendered inside
+        // #typo3-contentIframe. $closeUrl is a full module URL, which always renders
+        // the whole backend shell (topbar + sidebar + its own content iframe) - loaded
+        // without target="_top" it nests a second shell inside the first instead of
+        // navigating the real top-level window. Verified against TYPO3 14; keep it.
+        // TYPO3 13's LinkButton has no setAttributes() (only GenericButton does), so it is
+        // only set where the button supports it.
+        // @phpstan-ignore function.alreadyNarrowedType
+        if (method_exists($closeButton, 'setAttributes')) {
+            $closeButton->setAttributes(['target' => '_top']);
+        }
 
         $buttonBar->addButton($closeButton, ButtonBar::BUTTON_POSITION_LEFT);
     }
