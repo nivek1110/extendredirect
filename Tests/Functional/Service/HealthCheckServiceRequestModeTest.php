@@ -8,9 +8,13 @@ use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
 use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Context\UserAspect;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Http\Response;
+use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -261,5 +265,44 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
         self::assertCount(1, $result['broken']);
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
+
+    /**
+     * The real sub-request runs the frontend middleware stack, which replaces the backend user,
+     * the request global and the "backend.user" context aspect. The backend middleware that wraps
+     * the editor's save request decides from exactly that aspect whether to delete the session
+     * cookie - so it must come back untouched, or the editor is logged out right after saving.
+     */
+    public function testSubRequestLeavesTheEditorsBackendSessionStateUntouched(): void
+    {
+        $backendUser = new BackendUserAuthentication();
+        $backendUser->user = ['uid' => 1, 'username' => 'admin', 'admin' => 1];
+        $originalRequest = new ServerRequest('https://example.com/typo3/record/edit', 'POST');
+        $context = GeneralUtility::makeInstance(Context::class);
+        $context->setAspect('backend.user', new UserAspect($backendUser));
+        $GLOBALS['BE_USER'] = $backendUser;
+        $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+        $this->insertRedirect('/old', '/gone');
+
+        $service = new class (
+            GeneralUtility::makeInstance(ExtensionConfiguration::class),
+            GeneralUtility::makeInstance(SiteFinder::class)
+        ) extends HealthCheckService {
+            protected function dispatchSubRequest(string $location): ResponseInterface
+            {
+                // What the frontend stack does to the surrounding backend request.
+                $GLOBALS['BE_USER'] = null;
+                $GLOBALS['TYPO3_REQUEST'] = new ServerRequest('https://example.com/old', 'GET');
+                GeneralUtility::makeInstance(Context::class)->setAspect('backend.user', new UserAspect());
+
+                return new Response('php://temp', 404);
+            }
+        };
+
+        $service->runBulkCheck();
+
+        self::assertSame($backendUser, $GLOBALS['BE_USER']);
+        self::assertSame($originalRequest, $GLOBALS['TYPO3_REQUEST']);
+        self::assertTrue($context->getAspect('backend.user')->isLoggedIn());
     }
 }

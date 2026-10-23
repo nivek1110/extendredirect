@@ -18,6 +18,9 @@ broken-redirect filter, disable log, CSV import and the CLI/Scheduler commands. 
   `ManagementController` import/log rendering; `Documentation/` and this changelog.
 
 ### Fixed
+- Saving a redirect in the backend logged the editor out in `request` check mode: the frontend sub-request reset the
+  shared `backend.user` context aspect, so the backend middleware deleted the session cookie. The check now restores
+  `$GLOBALS['BE_USER']`, `$GLOBALS['TYPO3_REQUEST']` and the context aspects it clobbers.
 - A new redirect whose uid could not be resolved after saving made the save hook check every redirect.
 - Fatal errors on TYPO3 13.4 (the extension only loaded on 14.x): `ManagementController::registerDocHeaderButtons()`
   and the `RedirectDemand` constructor now match the core signatures of both majors (14.x added `redirectType`).

@@ -38,6 +38,12 @@ class HealthCheckService
 
     private const MAX_CHAIN_HOPS = 10;
 
+    /**
+     * Context aspects the frontend sub-request may overwrite and that the surrounding
+     * (backend) request must get back unchanged - see redirectFollower().
+     */
+    private const RESTORED_CONTEXT_ASPECTS = ['backend.user', 'frontend.user', 'workspace', 'visibility'];
+
     public function __construct(
         private readonly ExtensionConfiguration $extensionConfiguration,
         private readonly SiteFinder $siteFinder
@@ -229,24 +235,50 @@ class HealthCheckService
 
     protected function redirectFollower(string $location): ResponseInterface
     {
-        // Dispatching a sub-request through the full application kernel re-runs the
-        // frontend's backend-user-authenticator middleware, which - since the fabricated
-        // ServerRequest carries no backend session cookie - overwrites $GLOBALS['BE_USER']
-        // with null. That silently breaks any later session-based flash message (e.g. the
-        // one generated in DataHandlerHook::generateMessage() right after this runs), since
-        // FlashMessageQueue::storeFlashMessagesInSession() no-ops when there is no BE_USER.
+        // Dispatching a sub-request through the full application kernel re-runs the frontend
+        // middleware stack, which clobbers state the surrounding BACKEND request still relies on:
+        // - $GLOBALS['BE_USER'] becomes null (the fabricated request carries no backend cookie),
+        //   which silently breaks session-based flash messages afterwards;
+        // - $GLOBALS['TYPO3_REQUEST'] is replaced by the sub-request;
+        // - the "backend.user" aspect of the shared Context is reset to "not logged in". The
+        //   backend middleware wrapping the editor's save looks at exactly that aspect when it
+        //   builds the response and, finding no user, deletes the session cookie - so without
+        //   restoring it the editor is logged out right after saving a redirect.
         $backendUser = $GLOBALS['BE_USER'] ?? null;
+        $originalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $context = GeneralUtility::makeInstance(Context::class);
+        $aspects = [];
+        foreach (self::RESTORED_CONTEXT_ASPECTS as $name) {
+            if ($context->hasAspect($name)) {
+                $aspects[$name] = $context->getAspect($name);
+            }
+        }
 
+        try {
+            return $this->dispatchSubRequest($location);
+        } finally {
+            $GLOBALS['BE_USER'] = $backendUser;
+            if ($originalRequest !== null) {
+                $GLOBALS['TYPO3_REQUEST'] = $originalRequest;
+            }
+            foreach ($aspects as $name => $aspect) {
+                $context->setAspect($name, $aspect);
+            }
+        }
+    }
+
+    /**
+     * Runs the actual frontend sub-request. Kept apart from redirectFollower() so the state
+     * handling around it can be tested without booting a frontend.
+     */
+    protected function dispatchSubRequest(string $location): ResponseInterface
+    {
         $location = $this->resolveAbsoluteLocation($location);
 
         $request = GeneralUtility::makeInstance(ServerRequest::class);
         $subRequest = $request->withQueryParams([])->withUri(new Uri($location))->withMethod('GET');
-        $requestHandler = GeneralUtility::makeInstance(RequestHandler::class);
-        $response = $requestHandler->handle($subRequest);
 
-        $GLOBALS['BE_USER'] = $backendUser;
-
-        return $response;
+        return GeneralUtility::makeInstance(RequestHandler::class)->handle($subRequest);
     }
 
     /**

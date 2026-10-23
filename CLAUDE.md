@@ -80,6 +80,9 @@ Locked decisions:
   (`broken_redirect=1`) are, once healthy.
 - `sys_redirect.redirect_count` is a `varchar` on purpose (stores `'-'` on errors).
 - Bulk runs order by `sys_redirect.last_checked` (never-checked first) so `--limit`/`--max-runtime` rotate.
+- `HealthCheckService::redirectFollower()` must restore everything the frontend sub-request clobbers (`BE_USER`,
+  `TYPO3_REQUEST`, Context aspects `backend.user` etc.): otherwise the backend middleware deletes the editor's session
+  cookie after a save (logged out). Keep the actual dispatch in `dispatchSubRequest()`; the state handling is tested.
 - No real per-request timeout/parallelism: checks are in-process sub-requests sharing global state.
 - Version lives in `ext_emconf.php` AND `composer.json` (`extra.typo3/cms.version`, needed to avoid the TYPO3 14.3
   `ext_emconf.php` deprecation) - keep both in sync on release; `ext_emconf.php` stays for TER.
