@@ -3,7 +3,10 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.0] - 2026-10-23
+
+First release: health check (`request`/`database` mode), self-healing targets, page delete/hide guard,
+broken-redirect filter, disable log, CSV import and the CLI/Scheduler commands. For TYPO3 13.4 LTS and 14.3 LTS.
 
 ### Added
 - `extendredirect:cleanuplog` command (schedulable): deletes disable log entries older than `--days` (default 30).
@@ -34,8 +37,3 @@ All notable changes to this project are documented here. The format follows
   disable log table) are derived from TCA by the TYPO3 13+ core. Run "Analyze Database Structure" after updating.
   `redirect_count` now defaults to an empty string instead of `'0'`; the log's `source_path`/`target` become `TEXT`.
 - `CheckCommand` no longer sets a conflicting command name; the name comes from `Services.yaml`.
-
-## [1.0.0]
-
-- Initial release: health check (`request`/`database` mode), self-healing targets, page delete/hide guard,
-  broken-redirect filter, disable log, CSV import, CLI/Scheduler command.
