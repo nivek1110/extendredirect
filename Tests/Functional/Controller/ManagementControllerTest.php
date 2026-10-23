@@ -27,9 +27,19 @@ class ManagementControllerTest extends FunctionalTestCase
 
     private DisableLogRepository $logRepository;
 
+    /** @var array<string, mixed> request-related globals as they were before the test, restored in tearDown() */
+    private array $originalGlobals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        // The testing framework does not reset these, and e.g. TYPO3 13.4's DataHandler reads
+        // $GLOBALS['TYPO3_REQUEST'] - a request left behind here would break later test classes.
+        foreach (['TYPO3_REQUEST', 'BE_USER'] as $key) {
+            if (array_key_exists($key, $GLOBALS)) {
+                $this->originalGlobals[$key] = $GLOBALS[$key];
+            }
+        }
         $GLOBALS['LANG'] = GeneralUtility::makeInstance(LanguageServiceFactory::class)->create('en');
         $this->logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
     }
@@ -41,6 +51,18 @@ class ManagementControllerTest extends FunctionalTestCase
      * core is actually installed. deleteLogAction() under test never touches any
      * of these collaborators directly.
      */
+    protected function tearDown(): void
+    {
+        foreach (['TYPO3_REQUEST', 'BE_USER'] as $key) {
+            if (array_key_exists($key, $this->originalGlobals)) {
+                $GLOBALS[$key] = $this->originalGlobals[$key];
+            } else {
+                unset($GLOBALS[$key]);
+            }
+        }
+        parent::tearDown();
+    }
+
     private function createController(): ManagementController
     {
         $constructor = (new \ReflectionClass(ManagementController::class))->getConstructor();

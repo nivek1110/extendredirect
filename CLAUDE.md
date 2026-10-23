@@ -54,6 +54,11 @@ edits to `Classes/` reflect live. The shared seeder is `Build/Scripts/setup-demo
 Tests split into two suites by what they need to boot:
 - **`Tests/Unit/`** — pure PHPUnit `TestCase`, no TYPO3 bootstrap. Keep framework-free logic here so
   it runs fast.
+- **Functional tests must restore request-related globals.** The testing framework does not reset
+  `$GLOBALS['TYPO3_REQUEST']` / `BE_USER`; a leaked request without `applicationType` broke later test classes on
+  TYPO3 13.4 only (its DataHandler reads the global) while 14.3 stayed green. Save them in `setUp()`, restore in
+  `tearDown()`. Before tagging, run the suites against BOTH majors (`composer update --with="typo3/cms-core:^13.4"`,
+  run it twice if vendor ends up half-updated, then update back).
 - **`Tests/Functional/`** — `typo3/testing-framework`, boots TYPO3 + DB. Used for anything touching
   FAL, middlewares, TCA, or ViewHelpers.
 

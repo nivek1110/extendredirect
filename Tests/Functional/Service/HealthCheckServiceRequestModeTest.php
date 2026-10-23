@@ -36,9 +36,19 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
     /** @var \ArrayObject<int, string> every URL the service requested */
     private \ArrayObject $requestedUrls;
 
+    /** @var array<string, mixed> request-related globals as they were before the test, restored in tearDown() */
+    private array $originalGlobals = [];
+
     protected function setUp(): void
     {
         parent::setUp();
+        // The testing framework does not reset these, and e.g. TYPO3 13.4's DataHandler reads
+        // $GLOBALS['TYPO3_REQUEST'] - a request left behind here would break later test classes.
+        foreach (['TYPO3_REQUEST', 'BE_USER'] as $key) {
+            if (array_key_exists($key, $GLOBALS)) {
+                $this->originalGlobals[$key] = $GLOBALS[$key];
+            }
+        }
         $this->requestedUrls = new \ArrayObject();
         $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkMode'] = 'request';
         $GLOBALS['LANG'] = GeneralUtility::makeInstance(LanguageServiceFactory::class)->create('en');
@@ -46,6 +56,18 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $this->rootUid = $this->insertPage(0, '/', true);
         GeneralUtility::makeInstance(SiteWriter::class)->createNewBasicSite('main', $this->rootUid, 'https://example.com/');
         $this->redirects = GeneralUtility::makeInstance(RedirectRepository::class);
+    }
+
+    protected function tearDown(): void
+    {
+        foreach (['TYPO3_REQUEST', 'BE_USER'] as $key) {
+            if (array_key_exists($key, $this->originalGlobals)) {
+                $GLOBALS[$key] = $this->originalGlobals[$key];
+            } else {
+                unset($GLOBALS[$key]);
+            }
+        }
+        parent::tearDown();
     }
 
     private function insertPage(int $pid, string $slug, bool $siteRoot = false): int
