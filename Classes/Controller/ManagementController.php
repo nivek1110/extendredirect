@@ -208,6 +208,7 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         if (property_exists($this, 'componentFactory') && $this->componentFactory instanceof ComponentFactory) {
             return $this->componentFactory->createLinkButton();
         }
+        // @extensionScannerIgnoreLine TYPO3 13 fallback; on 14 the ComponentFactory branch above is used
         return $buttonBar->makeLinkButton();
     }
 
@@ -220,6 +221,7 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         if (property_exists($this, 'componentFactory') && $this->componentFactory instanceof ComponentFactory) {
             return $this->componentFactory->createCloseButton($closeUrl);
         }
+        // @extensionScannerIgnoreLine TYPO3 13 fallback; on 14 the ComponentFactory branch above is used
         return $buttonBar->makeLinkButton()
             ->setHref($closeUrl)
             ->setTitle($this->getLanguageService()->sL(

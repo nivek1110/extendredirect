@@ -45,6 +45,7 @@ class CleanupLogCommand extends Command
         $days = filter_var($input->getOption('days'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         if ($days === false) {
+            // @extensionScannerIgnoreLine SymfonyStyle::error(), not the core API of the same name
             $io->error('The "days" option must be an integer greater than 0.');
 
             return Command::FAILURE;

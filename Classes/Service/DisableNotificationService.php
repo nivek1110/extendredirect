@@ -130,11 +130,13 @@ class DisableNotificationService implements SingletonInterface
         }
 
         try {
+            // @extensionScannerIgnoreLine own private method, not TypoScriptFrontendController::getLanguage()
             $email = $this->createEmail($entries, $this->getLanguage());
             $email->to(...array_map(static fn(string $address): Address => new Address($address), $recipients));
             $this->mailer->send($email);
         } catch (\Throwable $exception) {
             // A broken mail setup must never break the save, the check or the page deletion.
+            // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
             $this->logger->error('Sending the redirect disable notification failed: ' . $exception->getMessage(), ['exception' => $exception]);
         }
     }

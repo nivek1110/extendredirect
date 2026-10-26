@@ -54,6 +54,7 @@ class CheckCommand extends Command
         foreach (['delay', 'max-runtime', 'limit'] as $name) {
             $value = filter_var($input->getOption($name), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
             if ($value === false) {
+                // @extensionScannerIgnoreLine SymfonyStyle::error(), not the core API of the same name
                 $this->io->error(sprintf('The "%s" option must be an integer of 0 or greater.', $name));
 
                 return Command::FAILURE;
