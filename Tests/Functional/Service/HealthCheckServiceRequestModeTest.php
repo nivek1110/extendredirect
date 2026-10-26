@@ -491,4 +491,43 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
             self::assertSame(1, (int) $row['disabled']);
         }
     }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function languageParameterProvider(): array
+    {
+        return ['_language' => ['_language=1'], 'legacy L' => ['L=1']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('languageParameterProvider')]
+    public function testADisabledRedirectWithALanguageParameterIsRequestedInThatLanguage(string $parameter): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $this->insertPageInSite($otherRoot, '/neu', 1, $english);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&' . $parameter, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://other.example/de/neu'], $this->requestedUrls->getArrayCopy());
+        $row = $this->redirects->findByUid($uid);
+        self::assertIsArray($row);
+        self::assertSame('t3://page?uid=' . $english . '&' . $parameter, $row['target'], 'the editor\'s link is kept as it is');
+    }
+
+    public function testADisabledRedirectToALanguageWithoutATranslationStaysBroken(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService([]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy(), 'no URL exists for the missing translation');
+    }
 }

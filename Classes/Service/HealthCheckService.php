@@ -478,7 +478,10 @@ class HealthCheckService
                 return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
             }
             $page = $this->findPageByUid((int) ($link['pageuid'] ?? 0));
-            $url = $page === null ? null : $this->buildPageUrl($page);
+            // "&_language=1" (or the legacy "&L=1") on the link picks a translation of the page.
+            parse_str((string) parse_url($target, PHP_URL_QUERY), $linkParameters);
+            $linkLanguage = $linkParameters['_language'] ?? $linkParameters['L'] ?? null;
+            $url = $page === null ? null : $this->buildPageUrl($page, is_numeric($linkLanguage) ? (int) $linkLanguage : null);
             if ($url === null) {
                 return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
             }
@@ -510,19 +513,43 @@ class HealthCheckService
      * the site's router so domain, language base and slug are right. Null if the page belongs to no site or
      * its language is not configured there.
      *
+     * A language given for a default language page (from "&_language=" on a page link) means its translation,
+     * which must exist.
+     *
      * @param array<string, mixed> $page
      */
-    protected function buildPageUrl(array $page): ?string
+    protected function buildPageUrl(array $page, ?int $languageId = null): ?string
     {
         try {
             $defaultLanguagePageId = (int) ($page['l10n_parent'] ?? 0) > 0 ? (int) $page['l10n_parent'] : (int) $page['uid'];
+            if ($languageId !== null && $languageId > 0 && (int) ($page['sys_language_uid'] ?? 0) === 0 && !$this->translationExists($defaultLanguagePageId, $languageId)) {
+                return null;
+            }
             $site = $this->siteFinder->getSiteByPageId($defaultLanguagePageId);
-            $language = $site->getLanguageById((int) ($page['sys_language_uid'] ?? 0));
+            $language = $site->getLanguageById($languageId !== null && (int) ($page['sys_language_uid'] ?? 0) === 0 ? $languageId : (int) ($page['sys_language_uid'] ?? 0));
 
             return (string) $site->getRouter()->generateUri($defaultLanguagePageId, ['_language' => $language]);
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    protected function translationExists(int $pageUid, int $languageId): bool
+    {
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+        $queryBuilder->getRestrictions()->removeAll()
+            ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
+            ->add(GeneralUtility::makeInstance(HiddenRestriction::class));
+
+        return (bool) $queryBuilder
+            ->count('uid')
+            ->from('pages')
+            ->where(
+                $queryBuilder->expr()->eq('l10n_parent', $queryBuilder->createNamedParameter($pageUid, ParameterType::INTEGER)),
+                $queryBuilder->expr()->eq('sys_language_uid', $queryBuilder->createNamedParameter($languageId, ParameterType::INTEGER))
+            )
+            ->executeQuery()
+            ->fetchOne();
     }
 
     /**

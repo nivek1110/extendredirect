@@ -30,6 +30,9 @@ All notable changes to this project are documented here. The format follows
 - `request` check mode, multi-site: a disabled redirect with a page link as target is now requested on the site (and in
   the language) of that page, built by the site router, instead of on every site of a wildcard source host. An absolute
   URL of a known site is requested there only.
+- `request` check mode: a disabled redirect whose page link carries `&_language=1` (or the legacy `&L=1`) is requested
+  in that language, and counts as broken if the page has no such translation. (A plain `&language=1` is not a
+  language parameter in TYPO3; it only becomes a query string.)
 - `request` check mode: an exception from the frontend (for example a site without TypoScript, "No page configured
   for type=0") no longer aborts the whole bulk run; it counts as a server error of that one redirect.
 - `request` check mode: a disabled (auto-disabled) redirect could never heal. The core ignores disabled redirects, so
