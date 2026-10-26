@@ -725,4 +725,17 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame('healthy', $this->check($service, $uid)['status']);
         self::assertSame(['https://other.example/de/nur-deutsch'], $this->requestedUrls->getArrayCopy());
     }
+
+    public function testARegexRedirectWithACaptureGroupInTheTargetIsNotCheckedButOneWithAConcreteTargetIs(): void
+    {
+        $dynamic = $this->insertRedirect('#^/a/(.*)$#', '/gone/$1', ['is_regexp' => 1]);
+        $concreteBroken = $this->insertRedirect('#^/b$#', '/does-not-exist', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($dynamic)['disabled'], 'a target with $1 cannot be verified: skipped');
+        self::assertSame(1, (int) $this->redirect($concreteBroken)['disabled'], 'a concrete target of a regex redirect can');
+        self::assertCount(0, $this->requestedUrls, 'the source is a pattern: never requested');
+    }
 }

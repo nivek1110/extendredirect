@@ -34,8 +34,8 @@ Regex redirects
 
 A regex source (`is_regexp`) has no concrete URL, so there is nothing to request: only the **target** is checked,
 and only if it is concrete - a page link or a path that must resolve to a visible page in its site and language, or
-a target on another host, which is left alone. A target with a capture group (:php:`/new/$1`) cannot be verified and
-counts as healthy; the pattern itself is not tested either.
+a target on another host, which is left alone. A redirect whose **target** contains a capture group (:php:`/new/$1`) is not
+checked at all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
 
 Several sites and languages
 ===========================
