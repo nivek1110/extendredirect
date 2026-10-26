@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
-  <path fill="#666" d="M12.053 11.026c-.238.07-.427.095-.674.095-2.033 0-5.017-7.1-5.017-9.462 0-.87.207-1.16.497-1.41C4.373.54 1.39 1.452.435 2.613c-.207.29-.332.746-.332 1.326C.103 7.628 4.04 16 6.82 16c1.283 0 3.45-2.114 5.233-4.974M10.756 0c2.57 0 5.14.415 5.14 1.865 0 2.943-1.865 6.508-2.818 6.508-1.7 0-3.814-4.725-3.814-7.088C9.264.207 9.68 0 10.756 0"></path>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Extend Redirect">
+  <title>Extend Redirect</title>
+  <rect width="64" height="64" rx="12" fill="#263238"/>
+  <g transform="translate(32 32) scale(1.12) translate(-32 -32)">
+    <path d="M32 7l21 7.5v17c0 12.5-9.5 21-21 26-11.5-5-21-13.5-21-26v-17z" fill="#fff"/>
+    <circle cx="17" cy="40" r="2" fill="#90a4ae"/>
+    <circle cx="22" cy="40" r="2" fill="#90a4ae"/>
+    <path d="M28 40h3a6 6 0 0 0 6-6v-2a6 6 0 0 1 6-6h1" fill="none" stroke="#263238" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M42 21l8 5-8 5z" fill="#263238"/>
+    <circle cx="48" cy="49" r="9" fill="#2e9e5b" stroke="#263238" stroke-width="2.5"/>
+    <path d="M43.7 49.4l3.3 3.3 5.4-6.4" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
