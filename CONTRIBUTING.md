@@ -38,6 +38,7 @@ instance: user **`admin`**, with a random password that the setup command prints
 | `ddev install-all` | Both side-by-side |
 | `ddev test [unit\|functional\|all]` | Run the PHPUnit suites |
 | `ddev lint` | PHPStan + php-cs-fixer (dry-run) |
+| `ddev scan-extension [13\|14\|build\|all] [--strict]` | Run TYPO3's Extension Scanner (Install Tool → Upgrade → *Scan Extension Files*) on `Classes/`, `Configuration/` and `ext_*.php` with the TYPO3 of the demo instances |
 | `ddev cgl-fix` | Auto-fix coding-style violations |
 | `ddev worktree-init [name]` | Give this git worktree a unique DDEV name so it can run alongside others |
 
@@ -54,6 +55,7 @@ ddev test unit          # pure PHPUnit, no TYPO3 boot — fast
 ddev test functional    # typo3/testing-framework: boots TYPO3 + DB
 ddev test all
 ddev lint               # PHPStan (level 8) + php-cs-fixer dry-run
+ddev scan-extension     # TYPO3 Extension Scanner against 13.4 and 14.x - must report no strong matches
 ```
 
 Single test file:

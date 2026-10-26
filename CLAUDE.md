@@ -40,6 +40,7 @@ ddev install-v14        # clickable TYPO3 v14 demo at https://v14.extendredirect
 ddev install-all        # both side-by-side
 ddev test [unit|functional|all]   # PHPUnit suites
 ddev lint               # PHPStan + php-cs-fixer (dry-run); `ddev cgl-fix` auto-fixes
+ddev scan-extension [13|14|build|all]   # TYPO3 Extension Scanner (Install Tool "Scan Extension Files") on CLI
 ddev worktree-init [name]         # give a git worktree its own DDEV project name
 ```
 
@@ -104,6 +105,10 @@ Locked decisions:
   `ReleaseNotesTest` fails if the CHANGELOG lacks a section for the current version or the version files disagree.
   The same workflow has a `ter` job (Tailor `ter:publish`, comment = `release-notes.sh --plain`) that is a no-op until the
   repo secret `TYPO3_API_TOKEN` exists and skips versions already in TER.
+- Extension Scanner: `Build/Scripts/extension-scan.php` (also run by `ExtensionScannerTest` in CI) must report no *strong*
+  matches. Silence false positives (a method name that only looks like a core one) with a `// @extensionScannerIgnoreLine`
+  comment above the line and say why. The demo instances link the whole repo as the extension, so the Install Tool scan
+  there lists ~14000 files - use `ddev scan-extension` or a Packagist install for a meaningful result.
 - Disable log table `tx_extendredirect_disable_log` has a hidden, admin-only TCA; retention via `cleanuplog`.
 
 Supported floor is **PHP 8.3 / TYPO3 13.4**, test matrix PHP 8.3/8.4/8.5 and TYPO3 13.4 + 14.x. Keep

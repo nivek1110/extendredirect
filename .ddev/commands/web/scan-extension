@@ -1,0 +1,50 @@
+#!/bin/bash
+## Description: Run TYPO3's Extension Scanner (Install Tool "Scan Extension Files") on the extension
+## Usage: scan-extension [13|14|build|all] [--strict]
+## Example: "ddev scan-extension 13"
+
+# Scans only Classes/, Configuration/ and ext_*.php - not the demo instances, which link the whole
+# working tree as the extension and would make the Install Tool scan 14000 files.
+#   13 / 14 - with the TYPO3 of the demo instance (ddev install-v13 / install-v14)
+#   build   - with the dev dependencies in .Build (the version composer installed)
+#   all     - 13 and 14 (default)
+# --strict also fails on "weak" matches (method names only, often false positives).
+
+cd /var/www/html || exit 1
+
+target="${1:-all}"
+shift || true
+
+scan() {
+    echo "=== $1"
+    php Build/Scripts/extension-scan.php --vendor="$2" "${@:3}"
+}
+
+status=0
+case "${target}" in
+    13|14)
+        if [ ! -d "v${target}/vendor/typo3/cms-install" ]; then
+            echo "No TYPO3 ${target} demo instance found - run 'ddev install-v${target}' first." >&2
+            exit 2
+        fi
+        scan "TYPO3 ${target}" "/var/www/html/v${target}/vendor" "$@" || status=1
+        ;;
+    build)
+        scan "TYPO3 from .Build" "/var/www/html/.Build/vendor" "$@" || status=1
+        ;;
+    all)
+        for version in 13 14; do
+            if [ -d "v${version}/vendor/typo3/cms-install" ]; then
+                scan "TYPO3 ${version}" "/var/www/html/v${version}/vendor" "$@" || status=1
+            else
+                echo "=== TYPO3 ${version}: skipped, no demo instance (ddev install-v${version})"
+            fi
+        done
+        ;;
+    *)
+        echo "Usage: ddev scan-extension [13|14|build|all] [--strict]" >&2
+        exit 2
+        ;;
+esac
+
+exit "${status}"
