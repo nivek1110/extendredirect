@@ -27,6 +27,7 @@ use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Persistence\Generic\PersistenceManager;
 use TYPO3\CMS\Redirects\Hooks\DataHandlerCacheFlushingHook;
+use TYPO3\CMS\Redirects\Service\RedirectCacheService;
 
 class HealthCheckService
 {
@@ -272,12 +273,26 @@ class HealthCheckService
             $this->logDisable($redirect, $check);
         }
 
+        $wasDisabled = (int) ($redirect['disabled'] ?? 0) === 1;
+        $isDisabled = (bool) $check['redirectError'];
+
         GeneralUtility::makeInstance(RedirectRepository::class)->updateHealthCheckResult(
             (int) $redirect['uid'],
-            (bool) $check['redirectError'],
+            $isDisabled,
             $check['redirectCount'],
             (string) $redirect['target']
         );
+
+        if ($wasDisabled !== $isDisabled) {
+            // The state is written with plain SQL, so the core's redirect index (cached for the frontend) must be
+            // rebuilt by hand: otherwise a healed redirect never fires - and the next check, which requests the
+            // source URL, wrongly finds it broken again - and a disabled one keeps redirecting.
+            GeneralUtility::makeInstance(RedirectCacheService::class)->rebuildForHost((string) ($redirect['source_host'] ?? '*'));
+        }
+        if ($wasDisabled && !$isDisabled) {
+            // Healthy and enabled again: the log entries no longer describe the redirect's state.
+            GeneralUtility::makeInstance(DisableLogRepository::class)->deleteByRedirectUid((int) $redirect['uid']);
+        }
 
         $persistanceManager = GeneralUtility::makeInstance(PersistenceManager::class);
         $persistanceManager->persistAll();

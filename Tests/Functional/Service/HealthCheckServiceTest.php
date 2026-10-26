@@ -10,6 +10,7 @@ use Nivek1110\Extendredirect\Service\HealthCheckService;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Redirects\Service\RedirectCacheService;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
@@ -418,6 +419,98 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $pageUid = $this->insertPage('/replacement');
 
         self::assertSame(HealthCheckService::RECHECK_NOT_FOUND, $this->subject->retarget(9999, $pageUid)['status']);
+    }
+
+    /**
+     * Replaces the core redirect index service with one that records which hosts get rebuilt (the next
+     * makeInstance() hands it out).
+     *
+     * @return \ArrayObject<int, string>
+     */
+    private function spyOnRedirectIndexRebuilds(): \ArrayObject
+    {
+        $hosts = new \ArrayObject();
+        GeneralUtility::addInstance(RedirectCacheService::class, new class ($hosts) extends RedirectCacheService {
+            /** @param \ArrayObject<int, string> $hosts */
+            public function __construct(private readonly \ArrayObject $hosts)
+            {
+                parent::__construct();
+            }
+
+            /** @return array<mixed> */
+            public function rebuildForHost(string $sourceHost): array
+            {
+                $this->hosts->append($sourceHost);
+
+                return [];
+            }
+        });
+
+        return $hosts;
+    }
+
+    public function testHealingARedirectRebuildsTheCoreRedirectIndexSoItFiresAgain(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        $this->insertPage('/later');
+        $rebuilds = $this->spyOnRedirectIndexRebuilds();
+
+        $this->subject->recheck($uid);
+
+        // The state is written with plain SQL; without a rebuild the frontend keeps its stale index, the
+        // healed redirect never fires and the next check wrongly sees it as broken again.
+        self::assertSame(['*'], $rebuilds->getArrayCopy());
+    }
+
+    public function testDisablingARedirectRebuildsTheCoreRedirectIndex(): void
+    {
+        $this->insertRedirect('/old', '/missing');
+        $rebuilds = $this->spyOnRedirectIndexRebuilds();
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(['*'], $rebuilds->getArrayCopy());
+    }
+
+    public function testHealingARedirectRemovesItsDisableLogEntries(): void
+    {
+        $logs = GeneralUtility::makeInstance(DisableLogRepository::class);
+        $uid = $this->insertRedirect('/old', '/later');
+        $other = $this->insertRedirect('/other', '/missing');
+        $this->subject->runBulkCheck();
+        self::assertSame(2, $logs->countAll());
+        $this->insertPage('/later');
+
+        $this->subject->recheck($uid);
+
+        $remaining = array_column($logs->findAll(), 'redirect_uid');
+        self::assertSame([$other], array_map('intval', $remaining));
+    }
+
+    public function testASecondRecheckOfAHealedRedirectKeepsItEnabled(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        $this->insertPage('/later');
+
+        $this->subject->recheck($uid);
+        $second = $this->subject->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $second['status']);
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testABulkRunThatHealsARedirectAlsoRemovesItsLogEntries(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        $this->insertPage('/later');
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+        self::assertSame(0, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
     }
 
     /**

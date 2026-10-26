@@ -94,6 +94,16 @@ class DisableLogRepository
     }
 
     /**
+     * Drops every entry of one redirect, e.g. once it is healthy and enabled again.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function deleteByRedirectUid(int $redirectUid): void
+    {
+        $this->getConnection()->delete(self::TABLE, ['redirect_uid' => $redirectUid]);
+    }
+
+    /**
      * @throws \Doctrine\DBAL\Exception
      */
     public function deleteAll(): void

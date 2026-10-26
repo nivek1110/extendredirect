@@ -29,6 +29,12 @@ All notable changes to this project are documented here. The format follows
   with "Check now" and with the new "Apply". Disabled redirects are now checked via their target (page link,
   same-site path); a target on another host is left alone, as in `database` mode.
 
+- Re-enabling or disabling a redirect through a check (bulk run, "Check now", "Apply") now rebuilds the core's redirect
+  index. Before, the state was only written to the database: a healed redirect did not redirect on the live site
+  until the cache was flushed, and the next check, which requests the source URL, disabled it again.
+- A redirect that is healthy and enabled again is removed from the disable log, so "Check now" can no longer be
+  clicked on a stale entry.
+
 ### Changed
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).
