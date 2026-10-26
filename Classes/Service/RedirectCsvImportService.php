@@ -138,9 +138,15 @@ class RedirectCsvImportService
     {
         $siteFinder = GeneralUtility::makeInstance(SiteFinder::class);
 
-        return array_map(
-            static fn($site): string => $site->getBase()->getHost(),
-            array_values($siteFinder->getAllSites())
-        );
+        // The base of every site and the domains of languages that have one of their own.
+        $hosts = [];
+        foreach ($siteFinder->getAllSites() as $site) {
+            $hosts[] = $site->getBase()->getHost();
+            foreach ($site->getLanguages() as $language) {
+                $hosts[] = $language->getBase()->getHost();
+            }
+        }
+
+        return array_values(array_unique(array_filter($hosts, static fn(string $host): bool => $host !== '')));
     }
 }

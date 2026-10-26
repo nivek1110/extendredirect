@@ -410,8 +410,9 @@ class HealthCheckService
         $scheme = 'https';
 
         foreach ($this->siteFinder->getAllSites() as $site) {
-            if ($site->getBase()->getHost() === $host) {
-                $scheme = $site->getBase()->getScheme();
+            $hosts = $this->getSiteHosts($site);
+            if (is_string($host) && isset($hosts[$host])) {
+                $scheme = $hosts[$host];
                 break;
             }
         }
@@ -898,12 +899,30 @@ class HealthCheckService
     protected function findSiteByHost(string $host): ?Site
     {
         foreach ($this->siteFinder->getAllSites() as $site) {
-            if ($site->getBase()->getHost() === $host) {
+            if (isset($this->getSiteHosts($site)[$host])) {
                 return $site;
             }
         }
 
         return null;
+    }
+
+    /**
+     * The domains a site answers on - its base and every language with a domain of its own - each with its scheme.
+     *
+     * @return array<string, string> scheme by host
+     */
+    protected function getSiteHosts(Site $site): array
+    {
+        $hosts = [$site->getBase()->getHost() => $site->getBase()->getScheme()];
+        foreach ($site->getLanguages() as $language) {
+            $host = $language->getBase()->getHost();
+            if ($host !== '' && !isset($hosts[$host])) {
+                $hosts[$host] = $language->getBase()->getScheme();
+            }
+        }
+
+        return $hosts;
     }
 
     protected function findSiteHostForPage(int $pageUid): ?string
@@ -996,13 +1015,18 @@ class HealthCheckService
      */
     protected function resolveUrls(array $redirect): array
     {
-        $sites = $this->findSitesBySourceHost($redirect['source_host']);
+        $sourceHost = (string) $redirect['source_host'];
         $path = $redirect['source_path'] ?? '';
 
+        // A specific host resolves to exactly its own domain (a site base or a language domain); "*" matches
+        // every domain of every site, language domains included.
         $urls = [];
-        foreach ($sites as $site) {
-            $host = $site->getBase()->getHost();
-            $urls[$host] = $site->getBase()->getScheme() . '://' . $host . $path;
+        foreach ($this->findSitesBySourceHost($sourceHost) as $site) {
+            foreach ($this->getSiteHosts($site) as $host => $scheme) {
+                if ($sourceHost === '*' || $host === $sourceHost) {
+                    $urls[$host] = $scheme . '://' . $host . $path;
+                }
+            }
         }
 
         return $urls;
@@ -1050,7 +1074,7 @@ class HealthCheckService
         }
 
         foreach ($sites as $site) {
-            if ($site->getBase()->getHost() === $sourceHost) {
+            if (isset($this->getSiteHosts($site)[$sourceHost])) {
                 return [$site];
             }
         }

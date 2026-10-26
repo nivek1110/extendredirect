@@ -8,6 +8,7 @@ use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use Nivek1110\Extendredirect\Service\RedirectCsvImportService;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -256,5 +257,26 @@ class RedirectCsvImportServiceTest extends FunctionalTestCase
         $redirect = $this->importedRedirects()[0];
         self::assertSame(1, (int) $redirect['force_https']);
         self::assertSame(0, (int) $redirect['keep_query_parameters']);
+    }
+
+    public function testASourceHostThatIsALanguageDomainIsAccepted(): void
+    {
+        $this->insertRootPageWithSite();
+        $connection = $this->getConnectionPool()->getConnectionForTable('pages');
+        $connection->insert('pages', ['pid' => 0, 'title' => 'Root 2', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        $writer = GeneralUtility::makeInstance(SiteWriter::class);
+        $writer->createNewBasicSite('second', (int) $connection->lastInsertId(), 'https://other.example.org/');
+        $configuration = GeneralUtility::makeInstance(SiteFinder::class)->getSiteByIdentifier('second')->getConfiguration();
+        $configuration['languages'][] = [
+            'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
+            'locale' => 'de_DE.UTF-8', 'base' => 'https://de.other.example.org/', 'enabled' => true, 'flag' => 'de',
+        ];
+        $writer->write('second', $configuration);
+
+        $this->writeCsv("source_host;source_path;target;target_statuscode\nde.other.example.org;/alt;/neu;301\n");
+        $result = $this->subject->importFromCsvFile($this->csvPath);
+
+        self::assertSame(1, $result['imported']);
+        self::assertSame(0, $result['ignoreCounter']);
     }
 }

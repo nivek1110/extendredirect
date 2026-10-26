@@ -384,7 +384,7 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
     /**
      * @param array<string, mixed> $languageOverrides
      */
-    private function createSecondSite(string $identifier, string $base, array $languageOverrides = [], bool $withGerman = false): int
+    private function createSecondSite(string $identifier, string $base, array $languageOverrides = [], bool $withGerman = false, string $germanBase = '/de/'): int
     {
         $rootUid = $this->insertPage(0, '/', true);
         $writer = GeneralUtility::makeInstance(SiteWriter::class);
@@ -394,7 +394,7 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         if ($withGerman) {
             $configuration['languages'][] = [
                 'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
-                'locale' => 'de_DE.UTF-8', 'base' => '/de/', 'enabled' => true, 'flag' => 'de',
+                'locale' => 'de_DE.UTF-8', 'base' => $germanBase, 'enabled' => true, 'flag' => 'de',
             ];
         }
         $writer->write($identifier, $configuration);
@@ -529,5 +529,38 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
         self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
         self::assertSame([], $this->requestedUrls->getArrayCopy(), 'no URL exists for the missing translation');
+    }
+
+    public function testASourceHostThatIsALanguageDomainIsRequestedThere(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, 'https://de.other.example/');
+        $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', '/new', ['source_host' => 'de.other.example']);
+        $service = $this->createService([
+            'https://de.other.example/old' => $this->redirectTo('https://de.other.example/new'),
+            'https://de.other.example/new' => $this->responseWithStatus(200),
+        ]);
+
+        $service->runBulkCheck();
+
+        // Before, only site bases were known hosts: this redirect was disabled as "unknown source host".
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertContains('https://de.other.example/old', $this->requestedUrls->getArrayCopy());
+        self::assertNotContains('https://other.example/old', $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testAWildcardRedirectIsCheckedOnLanguageDomainsToo(): void
+    {
+        $this->createSecondSite('other', 'https://other.example/', [], true, 'https://de.other.example/');
+        $this->insertRedirect('/old', '/new');
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        $requested = $this->requestedUrls->getArrayCopy();
+        self::assertContains('https://example.com/old', $requested);
+        self::assertContains('https://other.example/old', $requested);
+        self::assertContains('https://de.other.example/old', $requested, 'the wildcard also applies on the domain of a language');
     }
 }

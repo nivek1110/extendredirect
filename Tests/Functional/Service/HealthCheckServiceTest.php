@@ -9,6 +9,7 @@ use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Redirects\Service\RedirectCacheService;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -558,6 +559,31 @@ class HealthCheckServiceTest extends FunctionalTestCase
 
         self::assertSame(HealthCheckService::RECHECK_HEALTHY, $second['status']);
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testASourceHostThatIsALanguageDomainIsKnownInDatabaseMode(): void
+    {
+        $pages = $this->getConnectionPool()->getConnectionForTable('pages');
+        $pages->insert('pages', ['pid' => 0, 'title' => 'Other', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        $otherRoot = (int) $pages->lastInsertId();
+        $writer = GeneralUtility::makeInstance(SiteWriter::class);
+        $writer->createNewBasicSite('other', $otherRoot, 'https://other.example/');
+        $configuration = GeneralUtility::makeInstance(SiteFinder::class)->getSiteByIdentifier('other')->getConfiguration();
+        $configuration['languages'][] = [
+            'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
+            'locale' => 'de_DE.UTF-8', 'base' => 'https://de.other.example/', 'enabled' => true, 'flag' => 'de',
+        ];
+        $writer->write('other', $configuration);
+        $this->insertPage('/new'); // same slug in the main site, which must not be picked
+        $pages->insert('pages', ['pid' => $otherRoot, 'title' => 'New', 'slug' => '/new', 'doktype' => 1]);
+        $pageUid = (int) $pages->lastInsertId();
+        $uid = $this->insertRedirect('/old', '/new', ['source_host' => 'de.other.example']);
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $pageUid, $row['target'], 'the page of the site that owns the language domain');
     }
 
     /**

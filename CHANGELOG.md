@@ -27,6 +27,10 @@ All notable changes to this project are documented here. The format follows
   the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
 
 ### Fixed
+- Language domains: a language with a domain of its own (for example `de.example.com`) is now a known host. Before,
+  only site bases were: a redirect with such a source host was disabled as "unknown source host", and the CSV import
+  rejected it. The check requests the redirect on that domain, a `*` redirect is checked on every domain including the
+  language domains, and in `database` mode the site that owns the domain is used.
 - `request` check mode, multi-site: a disabled redirect with a page link as target is now requested on the site (and in
   the language) of that page, built by the site router, instead of on every site of a wildcard source host. An absolute
   URL of a known site is requested there only.
