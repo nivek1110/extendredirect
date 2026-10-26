@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-26
+
 ### Added
 - Redirects module: a "Last checked" column and a "Last check" filter (never checked, not checked for 1, 7 or 30
   days), so you can see whether the Scheduler actually runs.
@@ -21,6 +23,10 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).
+
+### Upgrade notes
+- No database changes. The new extension settings `notifyWebhookUrl` and `notifyWebhookFormat` are optional; nothing
+  changes until you set a webhook URL. Flush the caches (the new event class is excluded from dependency injection).
 
 ## [1.1.2] - 2026-10-26
 
