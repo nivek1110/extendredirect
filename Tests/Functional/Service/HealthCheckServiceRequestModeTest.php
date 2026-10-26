@@ -380,4 +380,115 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
         self::assertSame([], $this->requestedUrls->getArrayCopy());
     }
+
+    /**
+     * @param array<string, mixed> $languageOverrides
+     */
+    private function createSecondSite(string $identifier, string $base, array $languageOverrides = [], bool $withGerman = false): int
+    {
+        $rootUid = $this->insertPage(0, '/', true);
+        $writer = GeneralUtility::makeInstance(SiteWriter::class);
+        $writer->createNewBasicSite($identifier, $rootUid, $base);
+        $configuration = GeneralUtility::makeInstance(SiteFinder::class)->getSiteByIdentifier($identifier)->getConfiguration();
+        $configuration['languages'][0] = array_merge($configuration['languages'][0], $languageOverrides);
+        if ($withGerman) {
+            $configuration['languages'][] = [
+                'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
+                'locale' => 'de_DE.UTF-8', 'base' => '/de/', 'enabled' => true, 'flag' => 'de',
+            ];
+        }
+        $writer->write($identifier, $configuration);
+
+        return $rootUid;
+    }
+
+    private function insertPageInSite(int $rootUid, string $slug, int $language = 0, int $l10nParent = 0): int
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('pages');
+        $connection->insert('pages', [
+            'pid' => $rootUid, 'title' => $slug, 'slug' => $slug, 'doktype' => 1,
+            'sys_language_uid' => $language, 'l10n_parent' => $l10nParent,
+        ]);
+
+        return (int) $connection->lastInsertId();
+    }
+
+    public function testADisabledWildcardRedirectToAPageOfAnotherSiteIsRequestedOnThatSiteOnly(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/');
+        $pageUid = $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/new' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://other.example/new'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledRedirectToAPageIsRequestedWithTheLanguageBaseOfThePage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', ['base' => '/en/']);
+        $pageUid = $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/en/new' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://other.example/en/new'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledRedirectToATranslationIsRequestedInThatLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $german = $this->insertPageInSite($otherRoot, '/neu', 1, $english);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $german, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://other.example/de/neu'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledWildcardRedirectToAnAbsoluteUrlOfAKnownSiteIsRequestedOnThatSiteOnly(): void
+    {
+        $this->createSecondSite('other', 'https://other.example/');
+        $uid = $this->insertRedirect('/old', 'https://other.example/landing', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/landing' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://other.example/landing'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testAnExceptionFromTheFrontendDoesNotAbortTheRunAndCountsAsAServerError(): void
+    {
+        $first = $this->insertRedirect('/old-a', '/x');
+        $second = $this->insertRedirect('/old-b', '/y');
+        $service = new class (
+            GeneralUtility::makeInstance(ExtensionConfiguration::class),
+            GeneralUtility::makeInstance(SiteFinder::class)
+        ) extends HealthCheckService {
+            protected function dispatchSubRequest(string $location): ResponseInterface
+            {
+                // e.g. a site without TypoScript: "No page configured for type=0"
+                throw new \RuntimeException('No page configured for type=0.');
+            }
+        };
+
+        $result = $service->runBulkCheck();
+
+        self::assertSame(2, $result['checked'], 'one broken site must not stop the run');
+        self::assertCount(2, $result['broken']);
+        self::assertStringContainsString('500', $result['broken'][0]['message']);
+        foreach ([$first, $second] as $uid) {
+            $row = $this->redirects->findByUid($uid);
+            self::assertIsArray($row);
+            self::assertSame(1, (int) $row['disabled']);
+        }
+    }
 }

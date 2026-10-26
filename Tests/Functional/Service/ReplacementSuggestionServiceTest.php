@@ -6,6 +6,7 @@ namespace Nivek1110\Extendredirect\Tests\Functional\Service;
 
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Service\ReplacementSuggestionService;
+use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -15,10 +16,15 @@ class ReplacementSuggestionServiceTest extends FunctionalTestCase
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
     private ReplacementSuggestionService $subject;
+    private int $rootUid;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $pages = $this->getConnectionPool()->getConnectionForTable('pages');
+        $pages->insert('pages', ['pid' => 0, 'title' => 'Root', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        $this->rootUid = (int) $pages->lastInsertId();
+        GeneralUtility::makeInstance(SiteWriter::class)->createNewBasicSite('main', $this->rootUid, 'https://example.com/');
         $this->subject = GeneralUtility::makeInstance(ReplacementSuggestionService::class);
     }
 
@@ -28,7 +34,7 @@ class ReplacementSuggestionServiceTest extends FunctionalTestCase
     private function insertPage(string $slug, array $overrides = []): int
     {
         $connection = $this->getConnectionPool()->getConnectionForTable('pages');
-        $connection->insert('pages', array_merge(['pid' => 0, 'title' => $slug, 'slug' => $slug, 'doktype' => 1], $overrides));
+        $connection->insert('pages', array_merge(['pid' => $this->rootUid, 'title' => $slug, 'slug' => $slug, 'doktype' => 1], $overrides));
 
         return (int) $connection->lastInsertId();
     }
@@ -60,25 +66,27 @@ class ReplacementSuggestionServiceTest extends FunctionalTestCase
             'source_path' => '/x', 'target' => '/y', 'status_code' => '-', 'reason' => 'Page not found',
         ]);
         $all = $logs->findAll();
-        $entry = end($all);
+        $entry = reset($all);
         self::assertIsArray($entry);
 
         return $entry;
     }
 
-    public function testOnlyLinkableDefaultLanguagePagesAreCandidates(): void
+    public function testOnlyVisibleLinkablePagesOfTheDefaultLanguageAreCandidates(): void
     {
         $standard = $this->insertPage('/shop');
-        $this->insertPage('/folder', ['doktype' => 254]);
-        $this->insertPage('/extern', ['doktype' => 3]);
-        $this->insertPage('/gelöscht', ['deleted' => 1]);
-        $this->insertPage('/uebersetzt', ['sys_language_uid' => 1]);
-        $shortcut = $this->insertPage('/kurzbefehl', ['doktype' => 4]);
+        $this->insertPage('/shop-ordner', ['doktype' => 254]);
+        $this->insertPage('/shop-extern', ['doktype' => 3]);
+        $this->insertPage('/shop-geloescht', ['deleted' => 1]);
+        $this->insertPage('/shop-versteckt', ['hidden' => 1]);
+        $this->insertPage('/shop-uebersetzt', ['sys_language_uid' => 1]);
+        $shortcut = $this->insertPage('/shop-kurzbefehl', ['doktype' => 4]);
+        $entry = $this->logFor($this->insertRedirect('/shop-neu', 1, 1));
 
-        $uids = array_column($this->subject->findLinkablePages(), 'uid');
-        sort($uids);
+        $suggested = array_column($this->subject->suggestForLogEntries([$entry])[(int) $entry['uid']], 'uid');
+        sort($suggested);
 
-        self::assertSame([$standard, $shortcut], $uids);
+        self::assertSame([$standard, $shortcut], $suggested);
     }
 
     public function testBrokenRedirectsGetSuggestionsKeyedByLogEntry(): void

@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format follows
 - Disable log: a "Suggested target" column proposes up to three existing pages whose slug resembles the broken
   target (or the nearest existing parent page), with a similarity score. "Apply" sets the page as the new target
   and re-checks the redirect, which enables it again if healthy. Redirects disabled by hand get no suggestion.
+  With several sites or languages the suggestions stay inside the site(s) of the redirect's source host (every site
+  for `*`, with the host shown) and inside the language of the target: a language prefix such as `/en/`, or a language
+  with a domain of its own, selects the translated pages, otherwise the default language is used.
 - PSR-14 event `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`, dispatched for every redirect the health check
   or the page delete/hide guard disables, so your own code can react to it.
 - Optional webhook for disabled redirects: the extension settings `notifyWebhookUrl` and `notifyWebhookFormat`
@@ -24,6 +27,11 @@ All notable changes to this project are documented here. The format follows
   the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
 
 ### Fixed
+- `request` check mode, multi-site: a disabled redirect with a page link as target is now requested on the site (and in
+  the language) of that page, built by the site router, instead of on every site of a wildcard source host. An absolute
+  URL of a known site is requested there only.
+- `request` check mode: an exception from the frontend (for example a site without TypoScript, "No page configured
+  for type=0") no longer aborts the whole bulk run; it counts as a server error of that one redirect.
 - `request` check mode: a disabled (auto-disabled) redirect could never heal. The core ignores disabled redirects, so
   its source URL always answered 404 and the check stayed "broken" even after the target was fixed - in the bulk run,
   with "Check now" and with the new "Apply". Disabled redirects are now checked via their target (page link,

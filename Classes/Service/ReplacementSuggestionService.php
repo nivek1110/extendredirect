@@ -6,6 +6,10 @@ namespace Nivek1110\Extendredirect\Service;
 
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -66,14 +70,18 @@ class ReplacementSuggestionService
         return array_slice($suggestions, 0, self::MAX_SUGGESTIONS);
     }
 
+    public function __construct(private readonly SiteFinder $siteFinder) {}
+
     /**
      * Suggestions for the broken redirects among the given disable log entries.
      *
-     * Repaired entries and those whose redirect is gone, healthy again or was disabled by hand get none. The pages are
-     * loaded once for all entries.
+     * Repaired entries and those whose redirect is gone, healthy again or was disabled by hand get none.
+     * The pages are loaded once for all entries. Suggestions stay inside the site(s) the redirect's source
+     * host stands for (every site for "*") and inside the language of the target: a language prefix such as
+     * /de/ - or a language of its own domain - selects the translated pages, otherwise the default language.
      *
      * @param array<int, array<string, mixed>> $logEntries
-     * @return array<int, list<array{uid: int, title: string, slug: string, score: int}>> by log entry uid
+     * @return array<int, list<array{uid: int, title: string, slug: string, score: int, host: string, showHost: bool}>> by log entry uid
      */
     public function suggestForLogEntries(array $logEntries): array
     {
@@ -89,39 +97,154 @@ class ReplacementSuggestionService
             if (!is_array($redirect) || (int) $redirect['disabled'] !== 1 || (int) ($redirect['broken_redirect'] ?? 0) !== 1) {
                 continue;
             }
-            $pages ??= $this->findLinkablePages();
-            $result[(int) $entry['uid']] = self::rank((string) $redirect['target'], $pages);
+            $pages ??= $this->loadPages();
+            $result[(int) $entry['uid']] = $this->suggestFor((string) $redirect['source_host'], (string) $redirect['target'], $pages);
         }
 
         return $result;
     }
 
     /**
-     * Visible pages in the default language, without folders, external links and the like.
-     *
-     * @return list<array{uid: int, title: string, slug: string}>
+     * @param array{rows: list<array<string, mixed>>, parents: array<int, int>} $pages
+     * @return list<array{uid: int, title: string, slug: string, score: int, host: string, showHost: bool}>
      */
-    public function findLinkablePages(): array
+    private function suggestFor(string $sourceHost, string $target, array $pages): array
+    {
+        $scopes = $this->findScopes($sourceHost);
+        $showHost = count($this->siteFinder->getAllSites()) > 1;
+        $siteRootIds = array_values(array_map(static fn(Site $site): int => $site->getRootPageId(), $this->siteFinder->getAllSites()));
+
+        $best = [];
+        foreach ($scopes as $scope) {
+            [$languageId, $path] = $this->resolveLanguage($scope['site'], $scope['language'], $target);
+            $rootId = $scope['site']->getRootPageId();
+
+            $candidates = [];
+            foreach ($pages['rows'] as $row) {
+                if ((int) $row['sys_language_uid'] !== $languageId
+                    || (int) $row['hidden'] === 1
+                    || (string) $row['slug'] === ''
+                    || !in_array((int) $row['doktype'], self::LINKABLE_DOKTYPES, true)
+                    || $this->findSiteRootId($this->defaultLanguageUid($row), $pages['parents'], $siteRootIds) !== $rootId) {
+                    continue;
+                }
+                $candidates[] = ['uid' => (int) $row['uid'], 'title' => (string) $row['title'], 'slug' => (string) $row['slug']];
+            }
+
+            foreach (self::rank($path, $candidates) as $suggestion) {
+                $suggestion += ['host' => $scope['site']->getBase()->getHost(), 'showHost' => $showHost];
+                if (!isset($best[$suggestion['uid']]) || $best[$suggestion['uid']]['score'] < $suggestion['score']) {
+                    $best[$suggestion['uid']] = $suggestion;
+                }
+            }
+        }
+
+        $suggestions = array_values($best);
+        usort($suggestions, static fn(array $a, array $b): int => [$b['score'], strlen($a['slug'])] <=> [$a['score'], strlen($b['slug'])]);
+
+        return array_slice($suggestions, 0, self::MAX_SUGGESTIONS);
+    }
+
+    /**
+     * The sites a source host stands for, each with the language the host itself implies (a language with a
+     * domain of its own), if any. "*" and an empty host mean every site.
+     *
+     * @return list<array{site: Site, language: ?SiteLanguage}>
+     */
+    private function findScopes(string $sourceHost): array
+    {
+        $scopes = [];
+        foreach ($this->siteFinder->getAllSites() as $site) {
+            if ($sourceHost === '' || $sourceHost === '*' || $site->getBase()->getHost() === $sourceHost) {
+                $scopes[] = ['site' => $site, 'language' => null];
+                continue;
+            }
+            foreach ($site->getLanguages() as $language) {
+                if ($language->getBase()->getHost() === $sourceHost) {
+                    $scopes[] = ['site' => $site, 'language' => $language];
+                    break;
+                }
+            }
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * The language a target is in and its path without the language prefix. A language of its own domain
+     * wins; otherwise a prefix of the site base path (/de/) decides; otherwise it is the default language.
+     *
+     * @return array{0: int, 1: string}
+     */
+    private function resolveLanguage(Site $site, ?SiteLanguage $hostLanguage, string $target): array
+    {
+        if ($hostLanguage !== null) {
+            return [$hostLanguage->getLanguageId(), $target];
+        }
+
+        $path = '/' . trim((string) parse_url($target, PHP_URL_PATH), '/');
+        $sitePath = rtrim($site->getBase()->getPath(), '/');
+        foreach ($site->getLanguages() as $language) {
+            if ($language->getBase()->getHost() !== $site->getBase()->getHost()) {
+                continue;
+            }
+            $prefix = '/' . trim(substr(rtrim($language->getBase()->getPath(), '/'), strlen($sitePath)), '/');
+            if ($prefix !== '/' && ($path === $prefix || str_starts_with($path, $prefix . '/'))) {
+                return [$language->getLanguageId(), substr($path, strlen($prefix)) ?: '/'];
+            }
+        }
+
+        return [$site->getDefaultLanguage()->getLanguageId(), $target];
+    }
+
+    /**
+     * All pages that are not deleted, with the parent map needed to find the site a page belongs to.
+     *
+     * @return array{rows: list<array<string, mixed>>, parents: array<int, int>}
+     */
+    private function loadPages(): array
     {
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $expr = $queryBuilder->expr();
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
 
         $rows = $queryBuilder
-            ->select('uid', 'title', 'slug')
+            ->select('uid', 'pid', 'title', 'slug', 'doktype', 'hidden', 'sys_language_uid', 'l10n_parent')
             ->from('pages')
-            ->where(
-                $expr->eq('sys_language_uid', 0),
-                $expr->in('doktype', self::LINKABLE_DOKTYPES),
-                $expr->neq('slug', $queryBuilder->createNamedParameter(''))
-            )
             ->executeQuery()
             ->fetchAllAssociative();
 
-        return array_map(static fn(array $row): array => [
-            'uid' => (int) $row['uid'],
-            'title' => (string) $row['title'],
-            'slug' => (string) $row['slug'],
-        ], $rows);
+        $parents = [];
+        foreach ($rows as $row) {
+            $parents[(int) $row['uid']] = (int) $row['pid'];
+        }
+
+        return ['rows' => $rows, 'parents' => $parents];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function defaultLanguageUid(array $row): int
+    {
+        return (int) $row['l10n_parent'] > 0 ? (int) $row['l10n_parent'] : (int) $row['uid'];
+    }
+
+    /**
+     * The root page of the site a page belongs to (0 if none), found by walking up the parent map.
+     *
+     * @param array<int, int> $parents
+     * @param list<int> $siteRootIds
+     */
+    private function findSiteRootId(int $uid, array $parents, array $siteRootIds): int
+    {
+        for ($depth = 0; $depth < 100 && $uid > 0; $depth++) {
+            if (in_array($uid, $siteRootIds, true)) {
+                return $uid;
+            }
+            $uid = $parents[$uid] ?? 0;
+        }
+
+        return 0;
     }
 
     /**

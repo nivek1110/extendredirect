@@ -55,7 +55,7 @@
                                                         <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.apply" />
                                                     </a>
                                                     {suggestion.title -> f:format.crop(maxCharacters: 40)}
-                                                    <small class="text-body-secondary">{suggestion.slug -> f:format.crop(maxCharacters: 60)} · {suggestion.score}&nbsp;%</small>
+                                                    <small class="text-body-secondary"><f:if condition="{suggestion.showHost}">{suggestion.host}</f:if>{suggestion.slug -> f:format.crop(maxCharacters: 60)} · {suggestion.score}&nbsp;%</small>
                                                 </div>
                                             </f:for>
                                         </f:then>

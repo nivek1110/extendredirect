@@ -39,8 +39,8 @@ up unnoticed.
   redirect on demand: a healthy one is enabled again, a broken one stays disabled (redirects you
   disabled by hand are never touched). Entries of redirects that are healthy again stay in the log as
   history, flagged "Repaired" with the time, and offer no actions. A "Suggested target" column proposes up to three existing pages
-  that resemble the broken target (or its nearest existing parent page); "Apply" makes one the new
-  target and re-checks the redirect.
+  that resemble the broken target (or its nearest existing parent page), within the site and language of
+  the redirect; "Apply" makes one the new target and re-checks the redirect.
 - **Last checked** — the overview shows when each redirect was last checked and can filter for
   never-checked redirects or ones not checked for 1, 7 or 30 days, so you can see whether the
   Scheduler actually runs.

@@ -14,6 +14,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\RequestHandler;
+use TYPO3\CMS\Core\Http\Response;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\LinkHandling\LinkService;
@@ -358,6 +359,10 @@ class HealthCheckService
 
         try {
             return $this->dispatchSubRequest($location);
+        } catch (\Throwable) {
+            // A site that cannot render (e.g. no TypoScript: "No page configured for type=0") throws instead of
+            // answering. That is a server error of this one redirect, not a reason to abort the whole run.
+            return new Response('php://temp', 500);
         } finally {
             $GLOBALS['BE_USER'] = $backendUser;
             if ($originalRequest !== null) {
@@ -473,21 +478,51 @@ class HealthCheckService
                 return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
             }
             $page = $this->findPageByUid((int) ($link['pageuid'] ?? 0));
-            if ($page === null) {
+            $url = $page === null ? null : $this->buildPageUrl($page);
+            if ($url === null) {
                 return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
             }
-            $path = (string) $page['slug'];
-        } elseif (preg_match('#^(https?:)?//#i', $target) === 1) {
+
+            // The page link is already canonical: check on a copy so the check cannot rewrite it (e.g. to the
+            // default language page when the URL of a translation is resolved again).
+            $probe = $redirect;
+
+            return $this->checkSingleUrl($url, $probe);
+        }
+
+        if (preg_match('#^(https?:)?//#i', $target) === 1) {
             $host = (string) parse_url($target, PHP_URL_HOST);
             if ($this->findSiteByHost($host) === null) {
                 return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
             }
-            $path = (string) parse_url($target, PHP_URL_PATH);
-        } else {
-            $path = (string) parse_url($target, PHP_URL_PATH);
+
+            // An absolute URL of a known site is requested there, not on every site of a wildcard host.
+            return $this->checkSingleUrl(str_starts_with($target, '//') ? $this->resolveAbsoluteLocation($target) : $target, $redirect);
         }
 
+        $path = (string) parse_url($target, PHP_URL_PATH);
+
         return $this->checkSourceUrls($redirect, '/' . ltrim($path, '/'));
+    }
+
+    /**
+     * The absolute frontend URL of a page row (a translation row gives the URL in its language), built by
+     * the site's router so domain, language base and slug are right. Null if the page belongs to no site or
+     * its language is not configured there.
+     *
+     * @param array<string, mixed> $page
+     */
+    protected function buildPageUrl(array $page): ?string
+    {
+        try {
+            $defaultLanguagePageId = (int) ($page['l10n_parent'] ?? 0) > 0 ? (int) $page['l10n_parent'] : (int) $page['uid'];
+            $site = $this->siteFinder->getSiteByPageId($defaultLanguagePageId);
+            $language = $site->getLanguageById((int) ($page['sys_language_uid'] ?? 0));
+
+            return (string) $site->getRouter()->generateUri($defaultLanguagePageId, ['_language' => $language]);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -761,7 +796,7 @@ class HealthCheckService
             ->add(GeneralUtility::makeInstance(HiddenRestriction::class));
 
         $page = $queryBuilder
-            ->select('uid', 'pid', 'slug')
+            ->select('uid', 'pid', 'slug', 'sys_language_uid', 'l10n_parent')
             ->from('pages')
             ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($pageUid, ParameterType::INTEGER)))
             ->executeQuery()
