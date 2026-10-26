@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-26
+
+### Changed
+- New extension icon: a shield with a redirect arrow that turns from a dashed (broken) into a solid path, plus a
+  green health-check mark, replaces the generic grey placeholder. It is used in the Extension Manager and as the
+  icon of the disable log table.
+
+### Upgrade notes
+- No functional, database or configuration changes.
+
 ## [1.1.1] - 2026-10-26
 
 ### Changed
