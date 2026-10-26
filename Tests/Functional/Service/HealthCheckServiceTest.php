@@ -376,6 +376,50 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame(1, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
     }
 
+    public function testRetargetPointsABrokenRedirectAtTheChosenPageAndReenablesIt(): void
+    {
+        $uid = $this->insertRedirect('/old', '/missing');
+        $this->subject->runBulkCheck();
+        $pageUid = $this->insertPage('/replacement');
+
+        $result = $this->subject->retarget($uid, $pageUid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        $row = $this->redirect($uid);
+        self::assertSame('t3://page?uid=' . $pageUid, $row['target']);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame(0, (int) $row['broken_redirect']);
+    }
+
+    public function testRetargetRefusesAMissingPageAndKeepsTheTarget(): void
+    {
+        $uid = $this->insertRedirect('/old', '/missing');
+        $this->subject->runBulkCheck();
+
+        $result = $this->subject->retarget($uid, 9999);
+
+        self::assertSame(HealthCheckService::RETARGET_PAGE_NOT_FOUND, $result['status']);
+        self::assertSame('/missing', $this->redirect($uid)['target']);
+    }
+
+    public function testRetargetRefusesARedirectDisabledByHand(): void
+    {
+        $pageUid = $this->insertPage('/replacement');
+        $uid = $this->insertRedirect('/old', '/missing', ['disabled' => 1]);
+
+        $result = $this->subject->retarget($uid, $pageUid);
+
+        self::assertSame(HealthCheckService::RECHECK_MANUALLY_DISABLED, $result['status']);
+        self::assertSame('/missing', $this->redirect($uid)['target']);
+    }
+
+    public function testRetargetReportsAnUnknownRedirect(): void
+    {
+        $pageUid = $this->insertPage('/replacement');
+
+        self::assertSame(HealthCheckService::RECHECK_NOT_FOUND, $this->subject->retarget(9999, $pageUid)['status']);
+    }
+
     /**
      * @param list<array{uid: int, source: string, message: string, newlyDisabled: bool}> $broken
      * @return list<array{uid: int, newlyDisabled: bool}>

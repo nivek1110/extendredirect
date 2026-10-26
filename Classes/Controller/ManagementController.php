@@ -8,6 +8,7 @@ use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
 use Nivek1110\Extendredirect\Service\RedirectCsvExportService;
 use Nivek1110\Extendredirect\Service\RedirectCsvImportService;
+use Nivek1110\Extendredirect\Service\ReplacementSuggestionService;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\Components\Buttons\LinkButton;
@@ -90,8 +91,10 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         }
         $offset = ($currentPage - 1) * $itemsPerPage;
 
+        $logs = $logRepository->findPaginated($itemsPerPage, $offset);
         $view->assignMultiple([
-            'logs' => $logRepository->findPaginated($itemsPerPage, $offset),
+            'logs' => $logs,
+            'suggestions' => GeneralUtility::makeInstance(ReplacementSuggestionService::class)->suggestForLogEntries($logs),
             'pagination' => [
                 'current' => $currentPage,
                 'numberOfPages' => $numberOfPages,
@@ -141,11 +144,34 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
      */
     public function recheckAction(ServerRequestInterface $request): ResponseInterface
     {
-        $languageService = $this->getLanguageService();
-        $label = static fn(string $key): string => $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:' . $key);
-
         $result = GeneralUtility::makeInstance(HealthCheckService::class)
             ->recheck((int) ($request->getQueryParams()['redirectUid'] ?? 0));
+        $this->addRecheckFlashMessage($result);
+
+        return $this->redirectToLog();
+    }
+
+    /**
+     * Applies a suggested replacement page (?redirectUid=<uid>&pageUid=<uid>) as the redirect's new target,
+     * re-checks it and returns to the log.
+     */
+    public function applySuggestionAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $parameters = $request->getQueryParams();
+        $result = GeneralUtility::makeInstance(HealthCheckService::class)
+            ->retarget((int) ($parameters['redirectUid'] ?? 0), (int) ($parameters['pageUid'] ?? 0));
+        $this->addRecheckFlashMessage($result);
+
+        return $this->redirectToLog();
+    }
+
+    /**
+     * @param array{status: string, message: string} $result
+     */
+    protected function addRecheckFlashMessage(array $result): void
+    {
+        $languageService = $this->getLanguageService();
+        $label = static fn(string $key): string => $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:' . $key);
 
         match ($result['status']) {
             HealthCheckService::RECHECK_HEALTHY => $this->addFlashMessage(
@@ -162,13 +188,21 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
                 $label('flashMessage.recheck.title'),
                 ContextualFeedbackSeverity::INFO
             ),
+            HealthCheckService::RETARGET_PAGE_NOT_FOUND => $this->addFlashMessage(
+                $label('flashMessage.recheck.pageNotFound.message'),
+                $label('flashMessage.recheck.title'),
+                ContextualFeedbackSeverity::ERROR
+            ),
             default => $this->addFlashMessage(
                 $label('flashMessage.recheck.notFound.message'),
                 $label('flashMessage.recheck.title'),
                 ContextualFeedbackSeverity::ERROR
             ),
         };
+    }
 
+    protected function redirectToLog(): ResponseInterface
+    {
         return new RedirectResponse((string) GeneralUtility::makeInstance(UriBuilder::class)->buildUriFromRoute('redirect_disable_log'));
     }
 

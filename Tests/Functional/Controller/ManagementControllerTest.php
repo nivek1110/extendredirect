@@ -359,4 +359,82 @@ class ManagementControllerTest extends FunctionalTestCase
         self::assertStringContainsString('redirectUid=42', $body);
         self::assertStringContainsString('Check now', $body);
     }
+
+    /**
+     * A site with a root page, so that page targets can be resolved in "database" check mode.
+     */
+    private function createSiteWithPage(string $slug): int
+    {
+        $pages = $this->getConnectionPool()->getConnectionForTable('pages');
+        $pages->insert('pages', ['pid' => 0, 'title' => 'Root', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        $rootUid = (int) $pages->lastInsertId();
+        GeneralUtility::makeInstance(SiteWriter::class)->createNewBasicSite('main', $rootUid, 'https://example.com/');
+        $pages->insert('pages', ['pid' => $rootUid, 'title' => 'Schuhe', 'slug' => $slug, 'doktype' => 1]);
+
+        return (int) $pages->lastInsertId();
+    }
+
+    public function testTheLogSuggestsExistingPagesForABrokenRedirect(): void
+    {
+        $pageUid = $this->createSiteWithPage('/produkte/schuhe');
+        $redirectUid = $this->insertBrokenRedirect('/produkte/schuhe-neu');
+        $this->logRepository->add($this->logEntry($redirectUid));
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleLogRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringContainsString('/produkte/schuhe', $body);
+        self::assertStringContainsString('redirect_apply_suggestion', $body);
+        self::assertStringContainsString('pageUid=' . $pageUid, $body);
+        self::assertStringContainsString('redirectUid=' . $redirectUid, $body);
+    }
+
+    public function testTheLogOffersNoSuggestionForARedirectWithoutAMatch(): void
+    {
+        $this->createSiteWithPage('/produkte/schuhe');
+        $redirectUid = $this->insertBrokenRedirect('/xyzzy/qwertz');
+        $this->logRepository->add($this->logEntry($redirectUid));
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleLogRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringNotContainsString('redirect_apply_suggestion', $body);
+        self::assertStringContainsString('No matching page', $body);
+    }
+
+    public function testApplySuggestionActionRetargetsAndReenablesTheRedirect(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkMode'] = 'database';
+        $pageUid = $this->createSiteWithPage('/produkte/schuhe');
+        $redirectUid = $this->insertBrokenRedirect('/produkte/schuhe-neu');
+        $controller = $this->get(ManagementController::class);
+
+        $response = $controller->applySuggestionAction(
+            $this->createBackendRequest(['redirectUid' => (string) $redirectUid, 'pageUid' => (string) $pageUid])
+        );
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertStringContainsString('redirect_disable_log', $response->getHeaderLine('Location'));
+        $row = GeneralUtility::makeInstance(RedirectRepository::class)->findByUid($redirectUid);
+        self::assertIsArray($row);
+        self::assertSame('t3://page?uid=' . $pageUid, $row['target']);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertNotSame([], $this->flashMessageBodies());
+    }
+
+    public function testApplySuggestionActionWithAMissingPageChangesNothing(): void
+    {
+        $redirectUid = $this->insertBrokenRedirect('/produkte/schuhe-neu');
+        $controller = $this->get(ManagementController::class);
+
+        $response = $controller->applySuggestionAction(
+            $this->createBackendRequest(['redirectUid' => (string) $redirectUid, 'pageUid' => '9999'])
+        );
+
+        self::assertSame(302, $response->getStatusCode());
+        $row = GeneralUtility::makeInstance(RedirectRepository::class)->findByUid($redirectUid);
+        self::assertIsArray($row);
+        self::assertSame('/produkte/schuhe-neu', $row['target']);
+        self::assertSame(1, (int) $row['disabled']);
+    }
 }

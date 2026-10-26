@@ -15,6 +15,16 @@ Disable log: check now
 Every entry of the disable log has a :guilabel:`Check now` button. It re-checks that redirect: a healthy
 one is enabled again, a broken one stays disabled. A redirect that was disabled by hand is never touched.
 
+Suggested target
+================
+
+For every broken redirect the disable log proposes up to three existing, visible pages (default language;
+standard pages and shortcuts) whose slug resembles the path the redirect pointed at, with a similarity score
+in percent. If the leaf page is gone for good, the nearest existing parent page is offered instead.
+:guilabel:`Apply` sets the chosen page (as :php:`t3://page?uid=...`) as the new target and re-checks the
+redirect; a healthy redirect is enabled again. Nothing is ever applied automatically, and redirects that were
+disabled by hand get no suggestion.
+
 CSV export
 ==========
 

@@ -42,6 +42,7 @@ class HealthCheckService
     public const RECHECK_MANUALLY_DISABLED = 'manuallyDisabled';
     public const RECHECK_HEALTHY = 'healthy';
     public const RECHECK_BROKEN = 'broken';
+    public const RETARGET_PAGE_NOT_FOUND = 'pageNotFound';
 
     /**
      * Context aspects the frontend sub-request may overwrite and that the surrounding
@@ -106,6 +107,32 @@ class HealthCheckService
             'status' => $check['redirectError'] ? self::RECHECK_BROKEN : self::RECHECK_HEALTHY,
             'message' => (string) ($check['message'] ?? ''),
         ];
+    }
+
+    /**
+     * Points a broken redirect at an existing page (a suggestion of the disable log) and re-checks it, so a
+     * healthy result enables it again. Same refusals as recheck(), plus a page that does not exist.
+     *
+     * @return array{status: string, message: string}
+     * @throws Exception
+     */
+    public function retarget(int $uid, int $pageUid): array
+    {
+        $repository = GeneralUtility::makeInstance(RedirectRepository::class);
+        $redirect = $repository->findByUid($uid);
+        if (!is_array($redirect)) {
+            return ['status' => self::RECHECK_NOT_FOUND, 'message' => ''];
+        }
+        if ((int) $redirect['disabled'] === 1 && (int) ($redirect['broken_redirect'] ?? 0) === 0) {
+            return ['status' => self::RECHECK_MANUALLY_DISABLED, 'message' => ''];
+        }
+        if (!$this->pageExists($pageUid)) {
+            return ['status' => self::RETARGET_PAGE_NOT_FOUND, 'message' => ''];
+        }
+
+        $repository->updateTarget($uid, $this->toPageTypolink($pageUid));
+
+        return $this->recheck($uid);
     }
 
     /**

@@ -276,6 +276,21 @@
             <trans-unit id="log.recheck.title">
                 <source>Check this redirect again and enable it if it is healthy</source>
             </trans-unit>
+            <trans-unit id="log.table.suggestion">
+                <source>Suggested target</source>
+            </trans-unit>
+            <trans-unit id="log.suggestion.apply">
+                <source>Apply</source>
+            </trans-unit>
+            <trans-unit id="log.suggestion.apply.title">
+                <source>Use this page as the new target and check the redirect again</source>
+            </trans-unit>
+            <trans-unit id="log.suggestion.none">
+                <source>No matching page</source>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.pageNotFound.message">
+                <source>The chosen page does not exist (anymore). The redirect was not changed.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

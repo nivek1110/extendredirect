@@ -37,7 +37,9 @@ up unnoticed.
   has disabled, with the reason, source, target and timestamp — so nothing gets disabled silently.
   Entries can be deleted individually or all at once. A "Check now" button per entry re-checks that
   redirect on demand: a healthy one is enabled again, a broken one stays disabled (redirects you
-  disabled by hand are never touched).
+  disabled by hand are never touched). A "Suggested target" column proposes up to three existing pages
+  that resemble the broken target (or its nearest existing parent page); "Apply" makes one the new
+  target and re-checks the redirect.
 - **Last checked** — the overview shows when each redirect was last checked and can filter for
   never-checked redirects or ones not checked for 1, 7 or 30 days, so you can see whether the
   Scheduler actually runs.

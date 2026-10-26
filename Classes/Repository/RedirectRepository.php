@@ -86,6 +86,21 @@ class RedirectRepository extends \TYPO3\CMS\Redirects\Repository\RedirectReposit
     }
 
     /**
+     * Sets a new target without touching the redirect's state; the caller re-checks it.
+     *
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function updateTarget(int $uid, string $target): void
+    {
+        $queryBuilder = $this->getQueryBuilder();
+        $queryBuilder
+            ->update('sys_redirect')
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, ParameterType::INTEGER)))
+            ->set('target', $target)
+            ->executeStatement();
+    }
+
+    /**
      * Marks a redirect disabled/broken - used once its target no longer exists.
      *
      * @throws \Doctrine\DBAL\Exception

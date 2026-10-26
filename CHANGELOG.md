@@ -14,6 +14,9 @@ All notable changes to this project are documented here. The format follows
   can be edited and imported again. The CSV import accepts the optional columns `is_regexp` and `disabled` too.
 - Disable log: a "Check now" button per entry re-checks that redirect on demand. A healthy one is enabled again,
   a broken one stays disabled; redirects disabled by hand are never touched.
+- Disable log: a "Suggested target" column proposes up to three existing pages whose slug resembles the broken
+  target (or the nearest existing parent page), with a similarity score. "Apply" sets the page as the new target
+  and re-checks the redirect, which enables it again if healthy. Redirects disabled by hand get no suggestion.
 - PSR-14 event `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`, dispatched for every redirect the health check
   or the page delete/hide guard disables, so your own code can react to it.
 - Optional webhook for disabled redirects: the extension settings `notifyWebhookUrl` and `notifyWebhookFormat`
