@@ -466,9 +466,12 @@ class HealthCheckService
     }
 
     /**
-     * Whether a default language page can be shown in a language: the language is enabled and either the page is
-     * translated into it, or the language falls back (fallbackType "fallback") to the default language or to
-     * another language that has the page. In "strict" and "free" mode only a translation counts.
+     * Whether a default language page can be shown in a language: the language is enabled and the page is translated
+     * into it, or one of the languages of its fallback chain has the page - the default language always does.
+     *
+     * This follows TYPO3's LanguageAspectFactory: the chain ("fallbacks" of the site language) applies to pages in
+     * every fallbackType ("strict", "free", "fallback"); the type only decides what happens to content elements. An
+     * unknown type falls back to the default language. The chain is a flat list, not followed recursively.
      */
     protected function isPageAvailableInLanguage(int $defaultLanguagePageId, SiteLanguage $language): bool
     {
@@ -480,11 +483,13 @@ class HealthCheckService
         if ($languageId <= 0 || $this->translationExists($defaultLanguagePageId, $languageId)) {
             return true;
         }
-        if ($language->getFallbackType() === 'fallback') {
-            foreach ($language->getFallbackLanguageIds() as $fallbackLanguageId) {
-                if ((int) $fallbackLanguageId <= 0 || $this->translationExists($defaultLanguagePageId, (int) $fallbackLanguageId)) {
-                    return true;
-                }
+
+        $chain = in_array($language->getFallbackType(), ['strict', 'free', 'fallback'], true)
+            ? $language->getFallbackLanguageIds()
+            : [0];
+        foreach ($chain as $fallbackLanguageId) {
+            if ((int) $fallbackLanguageId <= 0 || $this->translationExists($defaultLanguagePageId, (int) $fallbackLanguageId)) {
+                return true;
             }
         }
 

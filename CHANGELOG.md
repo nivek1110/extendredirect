@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Languages with a fallback chain: a page counts as available in a language if it is translated into it or one of the
+  languages of its fallback chain (`fallbacks`) has it - the default language always does. This follows TYPO3, which
+  applies the chain to pages in every `fallbackType` (`strict`, `free`, `fallback`); the type only decides about content
+  elements. Before, only `fallbackType: fallback` was honoured, so a page link with `&_language=` into a language with a
+  chain in another type was reported broken. An unknown type falls back to the default language.
+
 ## [1.2.0] - 2026-10-26
 
 ### Added

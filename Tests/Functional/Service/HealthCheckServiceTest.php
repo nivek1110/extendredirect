@@ -461,7 +461,7 @@ class HealthCheckServiceTest extends FunctionalTestCase
      *
      * @param array<string, mixed> $germanOverrides
      */
-    private function createMultilingualSite(string $germanBase = '/de/', array $germanOverrides = []): int
+    private function createMultilingualSite(string $germanBase = '/de/', array $germanOverrides = [], bool $withFrench = false): int
     {
         $pages = $this->getConnectionPool()->getConnectionForTable('pages');
         $pages->insert('pages', ['pid' => 0, 'title' => 'Other', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
@@ -473,6 +473,12 @@ class HealthCheckServiceTest extends FunctionalTestCase
             'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
             'locale' => 'de_DE.UTF-8', 'base' => $germanBase, 'enabled' => true, 'flag' => 'de',
         ], $germanOverrides);
+        if ($withFrench) {
+            $configuration['languages'][] = [
+                'languageId' => 2, 'title' => 'Français', 'navigationTitle' => 'Français',
+                'locale' => 'fr_FR.UTF-8', 'base' => '/fr/', 'enabled' => true, 'flag' => 'fr',
+            ];
+        }
         $writer->write('other', $configuration);
 
         return $root;
@@ -560,12 +566,17 @@ class HealthCheckServiceTest extends FunctionalTestCase
      */
     public static function languageParameterAvailabilityProvider(): array
     {
+        // TYPO3 applies the fallback chain ("fallbacks") to pages in every fallbackType; the type only decides
+        // what happens to content elements. Without a chain a missing translation means "page not found".
         return [
             'translation exists' => [[], true, true],
-            'strict, no translation' => [['fallbackType' => 'strict'], false, false],
-            'free, no translation' => [['fallbackType' => 'free'], false, false],
-            'fallback to default, no translation' => [['fallbackType' => 'fallback', 'fallbacks' => '0'], false, true],
+            'strict, no chain' => [['fallbackType' => 'strict'], false, false],
+            'free, no chain' => [['fallbackType' => 'free'], false, false],
+            'fallback to default' => [['fallbackType' => 'fallback', 'fallbacks' => '0'], false, true],
+            'free with a chain to default' => [['fallbackType' => 'free', 'fallbacks' => '0'], false, true],
+            'strict with a chain to default' => [['fallbackType' => 'strict', 'fallbacks' => '0'], false, true],
             'fallback to a language without the page' => [['fallbackType' => 'fallback', 'fallbacks' => '5'], false, false],
+            'unknown type falls back to default' => [['fallbackType' => 'bogus'], false, true],
             'disabled language' => [['enabled' => false], true, false],
         ];
     }
@@ -586,6 +597,73 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $this->subject->runBulkCheck();
 
         self::assertSame($expectedHealthy ? 0 : 1, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testAFallbackChainFindsTheTranslationInAnotherLanguage(): void
+    {
+        $root = $this->createMultilingualSite('/de/', ['fallbackType' => 'fallback', 'fallbacks' => '2'], true);
+        $english = $this->insertOtherPage($root, '/new');
+        $this->insertOtherPage($root, '/nouveau', 2, $english);
+        $fromFrench = $this->insertRedirect('/old-a', 't3://page?uid=' . $english . '&_language=1', ['source_host' => 'other.example']);
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($fromFrench)['disabled'], 'German falls back to the French translation');
+    }
+
+    public function testAFallbackChainWithoutAnyTranslationOrDefaultIsBroken(): void
+    {
+        $root = $this->createMultilingualSite('/de/', ['fallbackType' => 'fallback', 'fallbacks' => '2'], true);
+        $english = $this->insertOtherPage($root, '/new');
+        $uid = $this->insertRedirect('/old-a', 't3://page?uid=' . $english . '&_language=1', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testAPageThatOnlyExistsInOneLanguageIsFoundByItsPath(): void
+    {
+        $root = $this->createMultilingualSite('/de/', ['fallbackType' => 'free']);
+        $standalone = $this->insertOtherPage($root, '/nur-deutsch', 1);
+        $uid = $this->insertRedirect('/old', '/de/nur-deutsch', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $standalone, $row['target']);
+    }
+
+    public function testAChainThroughALanguagePrefixIsFlattenedToTheTranslationOfTheFinalPage(): void
+    {
+        $root = $this->createMultilingualSite();
+        $englishB = $this->insertOtherPage($root, '/b');
+        $this->insertOtherPage($root, '/b', 1, $englishB);
+        $englishC = $this->insertOtherPage($root, '/c');
+        $germanC = $this->insertOtherPage($root, '/c', 1, $englishC);
+        // /old -> /de/b, and the page /de/b itself is the source of a second redirect to /de/c
+        $first = $this->insertRedirect('/old', '/de/b', ['source_host' => 'other.example']);
+        $this->insertRedirect('/de/b', '/de/c', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($first);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $germanC, $row['target'], 'the chain ends at the German page /de/c');
+    }
+
+    public function testAChainThatEndsInAMissingTranslationIsBroken(): void
+    {
+        $root = $this->createMultilingualSite();
+        $englishB = $this->insertOtherPage($root, '/b');
+        $this->insertOtherPage($root, '/b', 1, $englishB);
+        $this->insertOtherPage($root, '/c'); // no German translation
+        $first = $this->insertRedirect('/old', '/de/b', ['source_host' => 'other.example']);
+        $this->insertRedirect('/de/b', '/de/c', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($first)['disabled']);
     }
 
     /**

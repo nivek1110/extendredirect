@@ -714,4 +714,15 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame(1, (int) $this->redirect($toHidden)['disabled'], 'a hidden page is not there for visitors');
         self::assertSame(0, (int) $this->redirect($toExternal)['disabled'], 'an external target cannot be checked and is left alone');
     }
+
+    public function testADisabledRedirectToAPageThatOnlyExistsInOneLanguageIsRequestedInThatLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['fallbackType' => 'free']);
+        $standalone = $this->insertPageInSite($otherRoot, '/nur-deutsch', 1);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $standalone, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/nur-deutsch' => $this->responseWithStatus(200)]);
+
+        self::assertSame('healthy', $this->check($service, $uid)['status']);
+        self::assertSame(['https://other.example/de/nur-deutsch'], $this->requestedUrls->getArrayCopy());
+    }
 }

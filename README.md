@@ -101,8 +101,9 @@ healthy; the pattern itself is not tested either.
   as healthy if it works on all of them - a wildcard redirect to a path that exists on one site only is reported
   broken. Use the source host of the site instead.
 - The **language** of a target comes from its URL: a prefix such as `/de/`, the domain of a language, or `&_language=1`
-  (also `&L=1`) on a page link. A page that is not translated into that language is broken, unless the language falls
-  back to the default language (or another language that has the page). A disabled language has no frontend, so
+  (also `&L=1`) on a page link. A page that is not translated into that language is broken, unless the language's fallback
+  chain (`fallbacks` of the site language, any fallback type) reaches the default language or another language that has
+  the page. A disabled language has no frontend, so
   redirects into it are broken. Pages for all languages (`-1`) are available in every language.
 - The **page delete/hide protection** only disables redirects whose target is the page's URL in its own site and
   language - the same path on another site or in another language is left alone. A wildcard redirect with a relative
