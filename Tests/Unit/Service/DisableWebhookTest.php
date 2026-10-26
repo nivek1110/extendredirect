@@ -30,6 +30,9 @@ class DisableWebhookTest extends TestCase
 
     private bool $webhookFails = false;
 
+    /** @var \ArrayObject<string, bool> switches of the fake event dispatcher */
+    private \ArrayObject $dispatcherState;
+
     /**
      * @param array<string, mixed> $configuration
      */
@@ -43,13 +46,20 @@ class DisableWebhookTest extends TestCase
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn($configuration);
 
-        $dispatcher = new class ($this->events) implements EventDispatcherInterface {
-            /** @param \ArrayObject<int, object> $events */
-            public function __construct(private readonly \ArrayObject $events) {}
+        $this->dispatcherState = new \ArrayObject(['failing' => false]);
+        $dispatcher = new class ($this->events, $this->dispatcherState) implements EventDispatcherInterface {
+            /**
+             * @param \ArrayObject<int, object> $events
+             * @param \ArrayObject<string, bool> $state
+             */
+            public function __construct(private readonly \ArrayObject $events, private readonly \ArrayObject $state) {}
 
             public function dispatch(object $event): object
             {
                 $this->events->append($event);
+                if ($this->state['failing']) {
+                    throw new \RuntimeException('listener exploded');
+                }
 
                 return $event;
             }
@@ -243,5 +253,17 @@ class DisableWebhookTest extends TestCase
         $service->flush();
 
         self::assertStringContainsString('warning:', implode("\n", $this->logged->getArrayCopy()));
+    }
+
+    public function testAFailingEventListenerIsLoggedAndNeverBreaksTheSaveOrTheNotifications(): void
+    {
+        $service = $this->createService($this->webhook('text', 'single'));
+        $this->dispatcherState['failing'] = true;
+
+        $service->queue($this->entry(1));
+
+        self::assertCount(1, $this->events, 'the event was dispatched');
+        self::assertCount(1, $this->posts, 'the webhook still goes out');
+        self::assertStringContainsString('error: A listener of RedirectDisabledEvent failed: listener exploded', implode("\n", $this->logged->getArrayCopy()));
     }
 }

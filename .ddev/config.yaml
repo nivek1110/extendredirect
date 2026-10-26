@@ -11,10 +11,12 @@ xdebug_enabled: false
 # (the extension's own composer install — used for tests and `ddev demo`).
 # Each entry has the project_tld (.ddev.site) appended, so these resolve to
 # v13.extendredirect.ddev.site / v14.extendredirect.ddev.site — matched by the server_name
-# in .ddev/nginx_full/v13.conf / v14.conf.
+# in .ddev/nginx_full/v13.conf / v14.conf. v14.shop.extendredirect is the second domain of the
+# multi-site demo in the v14 install (site "shop"); the ~^v14\. server_name serves it too.
 additional_hostnames:
     - v13.extendredirect
     - v14.extendredirect
+    - v14.shop.extendredirect
     - extendredirect1
 additional_fqdns: []
 database:

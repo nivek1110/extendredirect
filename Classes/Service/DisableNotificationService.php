@@ -52,7 +52,13 @@ class DisableNotificationService implements SingletonInterface
      */
     public function queue(array $entry): void
     {
-        $this->eventDispatcher->dispatch(new RedirectDisabledEvent($entry));
+        try {
+            $this->eventDispatcher->dispatch(new RedirectDisabledEvent($entry));
+        } catch (\Throwable $exception) {
+            // A faulty listener of someone else's code must never break the save, the check or the page deletion.
+            // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
+            $this->logger->error('A listener of RedirectDisabledEvent failed: ' . $exception->getMessage(), ['exception' => $exception]);
+        }
 
         if (!$this->isEnabled()) {
             return;

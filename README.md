@@ -68,7 +68,7 @@ up unnoticed.
 - **Webhook and PSR-14 event** — the same notification can be posted as JSON to a webhook (a chat
   message for Slack/Mattermost/Rocket.Chat, or structured JSON for your own endpoint). Independent of
   that, every disabled redirect is dispatched as `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`,
-  so your own code can react to it.
+  so your own code can react to it. An exception in a listener is logged and never breaks the save or the check.
 - **No duplicate/confusing notifications** — the generic "Record saved" toast is suppressed on
   `sys_redirect` saves so it doesn't contradict the health-check's own outcome message (e.g.
   "Redirect disabled").
