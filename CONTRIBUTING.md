@@ -105,3 +105,17 @@ ddev setup && ddev demo     # (or ddev install-v13 / install-v14)
 `worktree-init` derives a unique DDEV name (and matching `v13.`/`v14.` hostnames) from the branch, so
 the worktree runs concurrently with your main checkout without host/volume collisions. The `.ddev/`
 config is committed and travels with every worktree.
+
+## Releasing
+
+1. Set the new version in `composer.json` (`extra.typo3/cms.version`), `ext_emconf.php` and
+   `Documentation/guides.xml`, and turn the `[Unreleased]` section of `CHANGELOG.md` into `## [x.y.z] - date`
+   (a test fails if the CHANGELOG has no section for the version in `composer.json`).
+2. Push to `main` and wait until CI is green.
+3. Tag that commit (`git tag -a vX.Y.Z -m "Release X.Y.Z"`) and push the tag.
+4. The **Release** workflow then checks that the tag matches the version files and creates the GitHub release
+   with the matching `CHANGELOG.md` section as its text. It does not wait for CI, so only tag a green commit.
+   For a tag that already exists, run the workflow by hand from the Actions tab and enter the tag.
+5. Packagist picks the tag up by itself. Upload the TER zip manually (built from the tag, e.g. with
+   `tailor`) - the upload comment is plain text.
+

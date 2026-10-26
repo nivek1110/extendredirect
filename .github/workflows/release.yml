@@ -1,0 +1,60 @@
+name: Release
+
+# Publishes a GitHub release for a version tag, with the matching CHANGELOG.md section as its text.
+# Tag only after CI is green on main - this workflow does not wait for the CI run.
+# For a tag that already exists (e.g. one pushed before this workflow was added), run it manually
+# from the Actions tab and enter the tag.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish a GitHub release for (e.g. v1.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write # creating a release needs write access
+
+jobs:
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # The workflow's own commit provides the notes script (an older tag does not contain it yet) ...
+      - uses: actions/checkout@v7
+
+      # ... and the tag provides the version files and the CHANGELOG that get published.
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          path: tagged
+
+      - name: Check that the tag matches the extension version
+        working-directory: tagged
+        run: |
+          version="${TAG#v}"
+          composer_version="$(jq -r '.extra["typo3/cms"].version' composer.json)"
+          emconf_version="$(grep -oP "'version' => '\K[^']+" ext_emconf.php)"
+          echo "tag: ${version} | composer.json: ${composer_version} | ext_emconf.php: ${emconf_version}"
+          if [ "${version}" != "${composer_version}" ] || [ "${version}" != "${emconf_version}" ]; then
+            echo "::error::Tag ${TAG} does not match the version in composer.json / ext_emconf.php"
+            exit 1
+          fi
+
+      - name: Create the release
+        run: |
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "Release ${TAG} already exists - leaving it untouched."
+            exit 0
+          fi
+          bash Build/Scripts/release-notes.sh "${TAG#v}" tagged/CHANGELOG.md > "${RUNNER_TEMP}/release-notes.md"
+          args=()
+          # v1.2.0-beta1 and the like are pre-releases
+          if [[ "${TAG}" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --verify-tag --title "${TAG}" --notes-file "${RUNNER_TEMP}/release-notes.md" "${args[@]}"

@@ -99,6 +99,9 @@ Locked decisions:
 - No `ext_tables.sql`: since TYPO3 13 the core derives DB columns from TCA (`DefaultTcaSchema`), so every column of
   `sys_redirect` (ours) and the log table is declared in TCA with an auto-creating type (`check`, `input`, `number`,
   `text`, `datetime` - NOT `passthrough`). Trade-off: no custom indexes on the log table.
+- Releases: tag `vX.Y.Z` on a green `main` commit; `.github/workflows/release.yml` creates the GitHub release from the
+  CHANGELOG section (`Build/Scripts/release-notes.sh`) after checking the tag against `composer.json`/`ext_emconf.php`.
+  `ReleaseNotesTest` fails if the CHANGELOG lacks a section for the current version or the version files disagree.
 - Disable log table `tx_extendredirect_disable_log` has a hidden, admin-only TCA; retention via `cleanuplog`.
 
 Supported floor is **PHP 8.3 / TYPO3 13.4**, test matrix PHP 8.3/8.4/8.5 and TYPO3 13.4 + 14.x. Keep
