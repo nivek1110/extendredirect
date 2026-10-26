@@ -192,8 +192,8 @@
             </trans-unit>
 
             <trans-unit id="import.format.optionalColumns">
-                <source>respect_query_parameters, keep_query_parameters and force_https are optional: leave the cell empty to skip, any other value enables it.</source>
-                <target>respect_query_parameters, keep_query_parameters und force_https sind optional: Zelle leer lassen zum Überspringen, jeder andere Wert aktiviert die Option.</target>
+                <source>respect_query_parameters, keep_query_parameters, force_https, is_regexp and disabled are optional: leave the cell empty to skip, any other value enables it.</source>
+                <target>respect_query_parameters, keep_query_parameters, force_https, is_regexp und disabled sind optional: Zelle leer lassen zum Überspringen, jeder andere Wert aktiviert die Option.</target>
             </trans-unit>
 
             <trans-unit id="import.format.subtitle">
@@ -344,6 +344,11 @@
             <trans-unit id="filter.lastChecked.stale30">
                 <source>Not checked for 30 days</source>
                 <target>Seit 30 Tagen nicht geprüft</target>
+            </trans-unit>
+
+            <trans-unit id="button.export">
+                <source>Export redirects</source>
+                <target>Redirects exportieren</target>
             </trans-unit>
         </body>
     </file>

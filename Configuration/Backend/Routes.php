@@ -10,6 +10,10 @@ return [
         'path' => '/redirect_import',
         'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::importAction',
     ],
+    'redirect_export' => [
+        'path' => '/redirect_export',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::exportAction',
+    ],
     'redirect_disable_log' => [
         'path' => '/redirect_disable_log',
         'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::handleLogRequest',

@@ -17,7 +17,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 class RedirectCsvImportService
 {
     private const ALLOWED_STATUS_CODES = [301, 302, 303, 307, 308];
-    private const OPTIONAL_BOOLEAN_FIELDS = ['respect_query_parameters', 'keep_query_parameters', 'force_https'];
+    private const OPTIONAL_BOOLEAN_FIELDS = ['respect_query_parameters', 'keep_query_parameters', 'force_https', 'is_regexp', 'disabled'];
     private const REQUIRED_FIELDS = ['source_host', 'source_path', 'target', 'target_statuscode'];
 
     /**
@@ -35,7 +35,7 @@ class RedirectCsvImportService
         $header = [];
 
         if (is_resource($file)) {
-            while (($data = fgetcsv($file, 9999, ';')) !== false) {
+            while (($data = fgetcsv($file, 9999, ';', '"', '')) !== false) {
                 if ($flag) {
                     $header = array_map(static fn($value): string => (string) $value, $data);
                     $flag = false;

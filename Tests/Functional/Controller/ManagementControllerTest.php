@@ -267,4 +267,30 @@ class ManagementControllerTest extends FunctionalTestCase
         self::assertStringContainsString('/never-checked-path', $body);
         self::assertStringNotContainsString('/checked-path', $body);
     }
+
+    public function testExportActionDownloadsTheRedirectsAsCsv(): void
+    {
+        $this->insertRedirect('/export-me', 0);
+        $controller = $this->get(ManagementController::class);
+
+        $response = $controller->exportAction($this->createBackendRequest());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('text/csv; charset=utf-8', $response->getHeaderLine('Content-Type'));
+        self::assertMatchesRegularExpression('/^attachment; filename="redirects-\d{4}-\d{2}-\d{2}\.csv"$/', $response->getHeaderLine('Content-Disposition'));
+        self::assertStringContainsString('no-store', $response->getHeaderLine('Cache-Control'));
+        $body = (string) $response->getBody();
+        self::assertStringStartsWith('source_host;source_path;target;target_statuscode;', $body);
+        self::assertStringContainsString('*;/export-me;/target;301;', $body);
+    }
+
+    public function testTheDocHeaderOffersAnExportButton(): void
+    {
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringContainsString('Export redirects', $body);
+        self::assertStringContainsString('redirect_export', $body);
+    }
 }

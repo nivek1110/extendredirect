@@ -5,6 +5,7 @@ namespace Nivek1110\Extendredirect\Controller;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
+use Nivek1110\Extendredirect\Service\RedirectCsvExportService;
 use Nivek1110\Extendredirect\Service\RedirectCsvImportService;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
@@ -12,6 +13,7 @@ use TYPO3\CMS\Backend\Template\Components\Buttons\LinkButton;
 use TYPO3\CMS\Backend\Template\Components\ComponentFactory;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
 use TYPO3\CMS\Core\Http\RedirectResponse;
+use TYPO3\CMS\Core\Http\Response;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Http\UploadedFile;
 use TYPO3\CMS\Core\Imaging\IconSize;
@@ -34,6 +36,24 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         $this->registerDocHeaderButtonsBack($view, (string) $request->getAttribute('normalizedParams')?->getRequestUri());
 
         return $view->renderResponse('Management/Import');
+    }
+
+    /**
+     * Downloads all redirects as a CSV file in the format of the import.
+     */
+    public function exportAction(ServerRequestInterface $request): ResponseInterface
+    {
+        if (!$this->canListRedirects()) {
+            return new Response('php://temp', 403);
+        }
+
+        $response = new Response();
+        $response->getBody()->write(GeneralUtility::makeInstance(RedirectCsvExportService::class)->export());
+
+        return $response
+            ->withHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->withHeader('Content-Disposition', 'attachment; filename="redirects-' . date('Y-m-d') . '.csv"')
+            ->withHeader('Cache-Control', 'no-store, private');
     }
 
     public function importAction(ServerRequestInterface $request): ResponseInterface
@@ -161,6 +181,14 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
             ->setShowLabelText(true)
             ->setIcon($this->iconFactory->getIcon('actions-add', IconSize::SMALL));
         $buttonBar->addButton($importButton, ButtonBar::BUTTON_POSITION_LEFT, 10);
+
+        // Export
+        $exportButton = $this->createLinkButton($buttonBar)
+            ->setHref((string) $uriBuilder->buildUriFromRoute('redirect_export'))
+            ->setTitle($this->getLanguageService()->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:button.export'))
+            ->setShowLabelText(true)
+            ->setIcon($this->iconFactory->getIcon('actions-download', IconSize::SMALL));
+        $buttonBar->addButton($exportButton, ButtonBar::BUTTON_POSITION_LEFT, 10);
 
         // Disable log
         $logButton = $this->createLinkButton($buttonBar)

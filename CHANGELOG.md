@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - Redirects module: a "Last checked" column and a "Last check" filter (never checked, not checked for 1, 7 or 30
   days), so you can see whether the Scheduler actually runs.
+- Redirects module: an "Export redirects" button downloads all redirects as CSV in the import format, so an export
+  can be edited and imported again. The CSV import accepts the optional columns `is_regexp` and `disabled` too.
 
 ## [1.1.2] - 2026-10-26
 
