@@ -124,10 +124,13 @@ class PageRedirectGuardService
             return true;
         }
 
+        $isRootSlug = trim((string) ($page['slug'] ?? ''), '/') === '';
+
         try {
             $site = $this->siteFinder->getSiteByPageId((int) ($page['l10n_parent'] ?? 0) > 0 ? (int) $page['l10n_parent'] : (int) $page['uid']);
         } catch (\Throwable) {
-            return true;
+            // Outside every site only the plain slug can be compared - which tells nothing for the root slug.
+            return !$isRootSlug;
         }
 
         $path = '/' . trim((string) parse_url($target, PHP_URL_PATH), '/');

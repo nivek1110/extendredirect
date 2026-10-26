@@ -261,4 +261,39 @@ class PageRedirectGuardMultiSiteTest extends FunctionalTestCase
         self::assertTrue($this->isDisabled($toGerman));
         self::assertFalse($this->isDisabled($toEnglish));
     }
+
+    public function testRedirectsToTheRootPageByPathAreFoundWhenTheRootPageIsGone(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/', '/de/');
+        $german = $this->insertPage($root, '/', ['sys_language_uid' => 1, 'l10n_parent' => $root]);
+        $byPath = $this->insertRedirect('/', 'example.com');
+        $byUrl = $this->insertRedirect('https://example.com/');
+        $germanByPath = $this->insertRedirect('/de/', 'example.com');
+        $other = $this->insertRedirect('/kontakt/');
+        $otherSite = $this->insertRedirect('https://other.example/');
+
+        $this->subject->disableRedirectsTargetingPage($root, 'healthCheck.targetPageDeleted');
+
+        self::assertTrue($this->isDisabled($byPath));
+        self::assertTrue($this->isDisabled($byUrl));
+        self::assertFalse($this->isDisabled($germanByPath), 'the German root page still exists');
+        self::assertFalse($this->isDisabled($other));
+        self::assertFalse($this->isDisabled($otherSite));
+        self::assertGreaterThan(0, $german);
+    }
+
+    public function testRedirectsToTheGermanRootPageByPathAreFoundWhenOnlyItIsGone(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/', '/de/');
+        $german = $this->insertPage($root, '/', ['sys_language_uid' => 1, 'l10n_parent' => $root]);
+        $englishByPath = $this->insertRedirect('/', 'example.com');
+        $germanByPath = $this->insertRedirect('/de/', 'example.com');
+        $germanNoSlash = $this->insertRedirect('/de');
+
+        $this->subject->disableRedirectsTargetingPage($german, 'healthCheck.targetPageHidden');
+
+        self::assertTrue($this->isDisabled($germanByPath));
+        self::assertTrue($this->isDisabled($germanNoSlash));
+        self::assertFalse($this->isDisabled($englishByPath));
+    }
 }

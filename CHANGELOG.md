@@ -25,10 +25,13 @@ All notable changes to this project are documented here. The format follows
   translation was hidden, and (for the root page `/`) nearly every redirect with a trailing slash. A page link with
   parameters (`t3://page?uid=5&_language=1`) is recognised too, pages for all languages (`-1`) match in every
   language, and hiding a default language page also covers redirects to its translations. Redirects to the root page
-  by path (`/`) are no longer found by the path; those by page link still are.
-- `request` check mode, languages: a page link into a disabled language is broken, a missing translation is broken
-  unless the language falls back to the default language (`fallbackType: fallback`), and a page for all languages
-  (`-1`) is requested in the default language or the one named by `&_language=`.
+  are found by page link and by their exact URL (`/`, `https://example.com/`, `/de/`).
+- Languages in both check modes: a page link into a disabled language is broken, a missing translation is broken
+  unless the language falls back (`fallbackType: fallback`) to the default language or to another language that has the
+  page, and a page for all languages (`-1`) is available in every language.
+- `database` check mode, languages: a target with a language prefix (`/de/products`) or a source host that is a language
+  domain is now resolved in that language, to the translated page; `&_language=` / `&L=` on a page link is checked for
+  an available translation. Before, the language prefix made such targets look broken.
 - Language domains: a language with a domain of its own (for example `de.example.com`) is now a known host. Before,
   only site bases were: a redirect with such a source host was disabled as "unknown source host", and the CSV import
   rejected it. The check requests the redirect on that domain, a `*` redirect is checked on every domain including the

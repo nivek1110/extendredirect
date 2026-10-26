@@ -29,6 +29,21 @@ The disable log is a history: an entry stays when its redirect is healed, and a 
 a new entry. When a check changes the state of a redirect, the core's redirect index is rebuilt, so an enabled
 redirect works on the live site right away and a disabled one stops redirecting.
 
+Several sites and languages
+===========================
+
+*   A redirect with a **specific source host** (a site domain or the domain of a language) is checked on exactly that
+    domain. A redirect for `*` applies on every domain of every site, language domains included, so it only counts as
+    healthy if it works on all of them: a wildcard redirect to a path that exists on one site only is reported broken.
+    Use the source host of the site instead.
+*   The **language** of a target comes from its URL: a prefix such as `/de/`, the domain of a language, or
+    `&_language=1` (also `&L=1`) on a page link. A page that is not translated into that language is broken, unless the
+    language falls back to the default language (or another language that has the page). A disabled language has no
+    frontend, so redirects into it are broken. Pages for all languages (`-1`) are available in every language.
+*   The **page delete/hide protection** only disables redirects whose target is the page's URL in its own site and
+    language; the same path on another site or in another language is left alone. A wildcard redirect with a relative
+    target counts for every site. Hiding a default language page also covers its translations.
+
 CSV export
 ==========
 

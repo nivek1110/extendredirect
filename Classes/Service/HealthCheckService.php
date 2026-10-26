@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -452,14 +453,9 @@ class HealthCheckService
                 // A disabled language has no frontend.
                 return null;
             }
-            // A default language page "in another language" needs a translation - unless that language falls back
-            // to the default language (fallbackType "fallback"), where the URL shows the default language content.
+            // A default language page "in another language" must be available there (see isPageAvailableInLanguage()).
             // Pages for all languages (-1) are available in every language.
-            // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
-            $targetLanguageId = $language->getLanguageId();
-            if ($targetLanguageId > 0 && $rowLanguageId === 0
-                && $language->getFallbackType() !== 'fallback'
-                && !$this->translationExists($defaultLanguagePageId, $targetLanguageId)) {
+            if ($rowLanguageId === 0 && !$this->isPageAvailableInLanguage($defaultLanguagePageId, $language)) {
                 return null;
             }
 
@@ -467,6 +463,32 @@ class HealthCheckService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Whether a default language page can be shown in a language: the language is enabled and either the page is
+     * translated into it, or the language falls back (fallbackType "fallback") to the default language or to
+     * another language that has the page. In "strict" and "free" mode only a translation counts.
+     */
+    protected function isPageAvailableInLanguage(int $defaultLanguagePageId, SiteLanguage $language): bool
+    {
+        if (!$language->isEnabled()) {
+            return false;
+        }
+        // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+        $languageId = $language->getLanguageId();
+        if ($languageId <= 0 || $this->translationExists($defaultLanguagePageId, $languageId)) {
+            return true;
+        }
+        if ($language->getFallbackType() === 'fallback') {
+            foreach ($language->getFallbackLanguageIds() as $fallbackLanguageId) {
+                if ((int) $fallbackLanguageId <= 0 || $this->translationExists($defaultLanguagePageId, (int) $fallbackLanguageId)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     protected function translationExists(int $pageUid, int $languageId): bool
@@ -718,6 +740,12 @@ class HealthCheckService
             if ($page === null) {
                 return null;
             }
+            // "&_language=1" (or the legacy "&L=1") asks for a translation of the page.
+            parse_str((string) parse_url($target, PHP_URL_QUERY), $linkParameters);
+            $linkLanguage = $linkParameters['_language'] ?? $linkParameters['L'] ?? null;
+            if (is_numeric($linkLanguage) && (int) $linkLanguage > 0 && (int) $page['sys_language_uid'] <= 0 && !$this->isLanguageAvailableForPage((int) $page['uid'], (int) $linkLanguage)) {
+                return null;
+            }
             $host = $this->findSiteHostForPage((int) $pageUid) ?? $sourceHost;
 
             return ['pageUid' => (int) $pageUid, 'slug' => (string) $page['slug'], 'host' => $host];
@@ -736,15 +764,92 @@ class HealthCheckService
             $expectedSite = $this->findSiteByHost($sourceHost);
         }
 
-        $page = $this->findPageBySlug($path, $expectedSite);
-        if ($page === null) {
+        // The language is part of the URL: a prefix such as /de/, or a language with a domain of its own.
+        // Without a known site (wildcard host, relative target) every site is tried.
+        $languageHost = is_string($host) ? $host : $sourceHost;
+        $sites = $expectedSite !== null ? [$expectedSite] : array_values($this->siteFinder->getAllSites());
+        foreach ($sites as $site) {
+            [$languageId, $lookupPath, $publicPrefix, $resolvedHost] = $this->detectPathLanguage($site, $languageHost, $path);
+            $page = $this->findPageBySlug($lookupPath, $site, $languageId);
+            if ($page !== null) {
+                return [
+                    'pageUid' => (int) $page['uid'],
+                    'slug' => '/' . trim($publicPrefix . '/' . trim((string) $page['slug'], '/'), '/'),
+                    'host' => $resolvedHost,
+                ];
+            }
+        }
+        if ($sites !== []) {
             return null;
         }
 
+        // No site configured at all: plain slug lookup.
+        $page = $this->findPageBySlug($path, null, null);
+        if ($page === null) {
+            return null;
+        }
         $pageUid = (int) $page['uid'];
-        $resolvedHost = $expectedSite?->getBase()->getHost() ?? $this->findSiteHostForPage($pageUid) ?? $sourceHost;
 
-        return ['pageUid' => $pageUid, 'slug' => (string) $page['slug'], 'host' => $resolvedHost];
+        return ['pageUid' => $pageUid, 'slug' => (string) $page['slug'], 'host' => $this->findSiteHostForPage($pageUid) ?? $sourceHost];
+    }
+
+    /**
+     * The language a path (of a given host) is in, found through the site's languages: a language with a domain
+     * of its own wins, otherwise a base path prefix such as /de/, otherwise the default language. Disabled
+     * languages are not considered - their URLs do not exist.
+     *
+     * @return array{0: int, 1: string, 2: string, 3: string} language id, path without the prefix, the prefix, host
+     */
+    protected function detectPathLanguage(Site $site, string $host, string $path): array
+    {
+        $siteHost = $site->getBase()->getHost();
+        $sitePath = rtrim($site->getBase()->getPath(), '/');
+        $normalised = '/' . trim($path, '/');
+
+        $languages = [];
+        foreach ($site->getLanguages() as $language) {
+            if ($language->isEnabled()) {
+                $languages[] = $language;
+            }
+        }
+
+        foreach ($languages as $language) {
+            $languageHost = $language->getBase()->getHost();
+            if ($languageHost !== $siteHost && strcasecmp($languageHost, $host) === 0) {
+                // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+                return [$language->getLanguageId(), $path, '', $languageHost];
+            }
+        }
+
+        // Longest prefix first, so /de-at/ wins over /de/.
+        usort($languages, static fn(SiteLanguage $a, SiteLanguage $b): int => strlen($b->getBase()->getPath()) <=> strlen($a->getBase()->getPath()));
+        foreach ($languages as $language) {
+            if ($language->getBase()->getHost() !== $siteHost) {
+                continue;
+            }
+            $prefix = '/' . trim(substr(rtrim($language->getBase()->getPath(), '/'), strlen($sitePath)), '/');
+            if ($prefix !== '/' && ($normalised === $prefix || str_starts_with(strtolower($normalised), strtolower($prefix) . '/'))) {
+                // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+                return [$language->getLanguageId(), substr($normalised, strlen($prefix)) ?: '/', $prefix, $siteHost];
+            }
+        }
+
+        // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+        return [$site->getDefaultLanguage()->getLanguageId(), $path, '', $siteHost];
+    }
+
+    /**
+     * Whether the (default language) page is available in the given language of its site.
+     */
+    protected function isLanguageAvailableForPage(int $defaultLanguagePageId, int $languageId): bool
+    {
+        try {
+            $site = $this->siteFinder->getSiteByPageId($defaultLanguagePageId);
+
+            return $this->isPageAvailableInLanguage($defaultLanguagePageId, $site->getLanguageById($languageId));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -775,7 +880,7 @@ class HealthCheckService
      *
      * @return array<mixed>|null
      */
-    protected function findPageBySlug(string $slug, ?Site $expectedSite): ?array
+    protected function findPageBySlug(string $slug, ?Site $expectedSite, ?int $languageId = null): ?array
     {
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
         $queryBuilder->getRestrictions()->removeAll()
@@ -785,7 +890,11 @@ class HealthCheckService
         $candidates = $queryBuilder
             ->select('uid', 'pid', 'slug')
             ->from('pages')
-            ->where($queryBuilder->expr()->eq('slug', $queryBuilder->createNamedParameter($slug, ParameterType::STRING)))
+            ->where(
+                $queryBuilder->expr()->eq('slug', $queryBuilder->createNamedParameter($slug, ParameterType::STRING)),
+                // the page of that language, or a page that exists in every language (-1)
+                ...($languageId === null ? [] : [$queryBuilder->expr()->in('sys_language_uid', [$languageId, -1])])
+            )
             ->executeQuery()
             ->fetchAllAssociative();
 

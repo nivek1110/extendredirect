@@ -73,8 +73,11 @@ class RedirectRepository extends \TYPO3\CMS\Redirects\Repository\RedirectReposit
             $queryBuilder->expr()->like('target', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($t3Link) . '&%')),
             $queryBuilder->expr()->like('target', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($t3Link) . '#%')),
         ];
-        // The root slug "/" ends nearly every path: only the page link can tell a redirect to the root page.
-        if ($slug !== null && $slug !== '' && trim($slug, '/') !== '') {
+        if ($slug !== null && $slug !== '' && trim($slug, '/') === '') {
+            // The root slug "/" ends nearly every path, so the end of the target tells nothing: take every path
+            // target as a candidate and let the caller compare it with the exact URL of the root page.
+            $conditions[] = $queryBuilder->expr()->notLike('target', $queryBuilder->createNamedParameter('t3://%'));
+        } elseif ($slug !== null && $slug !== '') {
             $conditions[] = $queryBuilder->expr()->like(
                 'target',
                 $queryBuilder->createNamedParameter('%' . $queryBuilder->escapeLikeWildcards($slug))

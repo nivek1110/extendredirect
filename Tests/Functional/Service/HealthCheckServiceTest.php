@@ -443,6 +443,9 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $writer->write('other', $configuration);
         $this->insertPage('/new'); // same slug in the main site, which must not be picked
         $pages->insert('pages', ['pid' => $otherRoot, 'title' => 'New', 'slug' => '/new', 'doktype' => 1]);
+        $english = (int) $pages->lastInsertId();
+        // the language domain shows German pages: the page needs a German translation to be there
+        $pages->insert('pages', ['pid' => $otherRoot, 'title' => 'Neu', 'slug' => '/new', 'doktype' => 1, 'sys_language_uid' => 1, 'l10n_parent' => $english]);
         $pageUid = (int) $pages->lastInsertId();
         $uid = $this->insertRedirect('/old', '/new', ['source_host' => 'de.other.example']);
 
@@ -451,6 +454,138 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $row = $this->redirect($uid);
         self::assertSame(0, (int) $row['disabled']);
         self::assertSame('t3://page?uid=' . $pageUid, $row['target'], 'the page of the site that owns the language domain');
+    }
+
+    /**
+     * A second site "other" (https://other.example/) with its root page and the language Deutsch (id 1).
+     *
+     * @param array<string, mixed> $germanOverrides
+     */
+    private function createMultilingualSite(string $germanBase = '/de/', array $germanOverrides = []): int
+    {
+        $pages = $this->getConnectionPool()->getConnectionForTable('pages');
+        $pages->insert('pages', ['pid' => 0, 'title' => 'Other', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        $root = (int) $pages->lastInsertId();
+        $writer = GeneralUtility::makeInstance(SiteWriter::class);
+        $writer->createNewBasicSite('other', $root, 'https://other.example/');
+        $configuration = GeneralUtility::makeInstance(SiteFinder::class)->getSiteByIdentifier('other')->getConfiguration();
+        $configuration['languages'][] = array_merge([
+            'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
+            'locale' => 'de_DE.UTF-8', 'base' => $germanBase, 'enabled' => true, 'flag' => 'de',
+        ], $germanOverrides);
+        $writer->write('other', $configuration);
+
+        return $root;
+    }
+
+    private function insertOtherPage(int $root, string $slug, int $language = 0, int $l10nParent = 0): int
+    {
+        $pages = $this->getConnectionPool()->getConnectionForTable('pages');
+        $pages->insert('pages', [
+            'pid' => $root, 'title' => $slug, 'slug' => $slug, 'doktype' => 1,
+            'sys_language_uid' => $language, 'l10n_parent' => $l10nParent,
+        ]);
+
+        return (int) $pages->lastInsertId();
+    }
+
+    public function testDatabaseModeUnderstandsALanguagePrefixInTheTarget(): void
+    {
+        $root = $this->createMultilingualSite();
+        $english = $this->insertOtherPage($root, '/produkte/schuhe');
+        $german = $this->insertOtherPage($root, '/produkte/schuhe', 1, $english);
+        $uid = $this->insertRedirect('/old', '/de/produkte/schuhe', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $german, $row['target'], 'the translation, not the default language page');
+    }
+
+    public function testDatabaseModeRejectsALanguagePrefixWithoutATranslation(): void
+    {
+        $root = $this->createMultilingualSite();
+        $this->insertOtherPage($root, '/produkte/schuhe');
+        $uid = $this->insertRedirect('/old', '/de/produkte/schuhe', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testDatabaseModeUnderstandsALanguageDomainAsSourceHost(): void
+    {
+        $root = $this->createMultilingualSite('https://de.other.example/');
+        $english = $this->insertOtherPage($root, '/produkte/schuhe');
+        $german = $this->insertOtherPage($root, '/produkte/schuhe-de', 1, $english);
+        $uid = $this->insertRedirect('/old', '/produkte/schuhe-de', ['source_host' => 'de.other.example']);
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $german, $row['target']);
+    }
+
+    public function testDatabaseModeResolvesAWildcardTargetWithALanguagePrefixOnAnySite(): void
+    {
+        $root = $this->createMultilingualSite();
+        $english = $this->insertOtherPage($root, '/produkte/schuhe');
+        $german = $this->insertOtherPage($root, '/produkte/schuhe-de', 1, $english);
+        $uid = $this->insertRedirect('/old', '/de/produkte/schuhe-de');
+
+        $this->subject->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $german, $row['target']);
+    }
+
+    public function testDatabaseModeAcceptsAPageForAllLanguagesInEveryLanguage(): void
+    {
+        $root = $this->createMultilingualSite();
+        $this->insertOtherPage($root, '/impressum', -1);
+        $plain = $this->insertRedirect('/old-a', '/impressum', ['source_host' => 'other.example']);
+        $german = $this->insertRedirect('/old-b', '/de/impressum', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($plain)['disabled']);
+        self::assertSame(0, (int) $this->redirect($german)['disabled']);
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>, 1: bool, 2: bool}> overrides, translation exists, expected healthy
+     */
+    public static function languageParameterAvailabilityProvider(): array
+    {
+        return [
+            'translation exists' => [[], true, true],
+            'strict, no translation' => [['fallbackType' => 'strict'], false, false],
+            'free, no translation' => [['fallbackType' => 'free'], false, false],
+            'fallback to default, no translation' => [['fallbackType' => 'fallback', 'fallbacks' => '0'], false, true],
+            'fallback to a language without the page' => [['fallbackType' => 'fallback', 'fallbacks' => '5'], false, false],
+            'disabled language' => [['enabled' => false], true, false],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $germanOverrides
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('languageParameterAvailabilityProvider')]
+    public function testDatabaseModeChecksTheLanguageOfAPageLink(array $germanOverrides, bool $translationExists, bool $expectedHealthy): void
+    {
+        $root = $this->createMultilingualSite('/de/', $germanOverrides);
+        $english = $this->insertOtherPage($root, '/new');
+        if ($translationExists) {
+            $this->insertOtherPage($root, '/neu', 1, $english);
+        }
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['source_host' => 'other.example']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame($expectedHealthy ? 0 : 1, (int) $this->redirect($uid)['disabled']);
     }
 
     /**

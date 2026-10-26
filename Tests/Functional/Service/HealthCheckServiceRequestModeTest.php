@@ -606,7 +606,7 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
     public function testAMissingTranslationIsFineWhenTheLanguageFallsBackToTheDefaultLanguage(): void
     {
-        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['fallbackType' => 'fallback', 'fallbackChain' => [0]]);
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['fallbackType' => 'fallback', 'fallbacks' => '0']);
         $english = $this->insertPageInSite($otherRoot, '/new');
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/de/new' => $this->responseWithStatus(200)]);
