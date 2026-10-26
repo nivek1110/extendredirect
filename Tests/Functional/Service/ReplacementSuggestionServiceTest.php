@@ -102,4 +102,16 @@ class ReplacementSuggestionServiceTest extends FunctionalTestCase
 
         self::assertSame([], $this->subject->suggestForLogEntries([$manual, $healthy, $gone]));
     }
+
+    public function testARepairedEntryGetsNoSuggestionsEvenIfTheRedirectBrokeAgain(): void
+    {
+        $this->insertPage('/produkte/schuhe');
+        $uid = $this->insertRedirect('/produkte/schuhe-neu', 1, 1);
+        $entry = $this->logFor($uid);
+        $this->getConnectionPool()->getConnectionForTable('tx_extendredirect_disable_log')
+            ->update('tx_extendredirect_disable_log', ['repaired' => 1700000000], ['uid' => $entry['uid']]);
+        $entry['repaired'] = 1700000000;
+
+        self::assertSame([], $this->subject->suggestForLogEntries([$entry]));
+    }
 }

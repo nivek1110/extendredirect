@@ -102,6 +102,10 @@ class HealthCheckService
 
         $check = $this->checkRedirect($redirect);
         $this->updateRedirect($redirect, $check);
+        if (!$check['redirectError']) {
+            // Also covers a redirect that is healthy already but still has an open entry from before.
+            $this->markLogEntriesRepaired($uid);
+        }
         GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
 
         return [
@@ -290,12 +294,23 @@ class HealthCheckService
             GeneralUtility::makeInstance(RedirectCacheService::class)->rebuildForHost((string) ($redirect['source_host'] ?? '*'));
         }
         if ($wasDisabled && !$isDisabled) {
-            // Healthy and enabled again: the log entries no longer describe the redirect's state.
-            GeneralUtility::makeInstance(DisableLogRepository::class)->deleteByRedirectUid((int) $redirect['uid']);
+            $this->markLogEntriesRepaired((int) $redirect['uid']);
         }
 
         $persistanceManager = GeneralUtility::makeInstance(PersistenceManager::class);
         $persistanceManager->persistAll();
+    }
+
+    /**
+     * The disable log is the history of what was disabled when: a healed redirect keeps its entries, flagged
+     * as repaired, instead of losing them.
+     */
+    protected function markLogEntriesRepaired(int $redirectUid): void
+    {
+        GeneralUtility::makeInstance(DisableLogRepository::class)->markRepairedByRedirectUid(
+            $redirectUid,
+            (int) GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp')
+        );
     }
 
     /**

@@ -291,6 +291,9 @@
             <trans-unit id="flashMessage.recheck.pageNotFound.message">
                 <source>The chosen page does not exist (anymore). The redirect was not changed.</source>
             </trans-unit>
+            <trans-unit id="log.repaired">
+                <source>Repaired</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

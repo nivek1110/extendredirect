@@ -15,6 +15,10 @@ Disable log: check now
 Every entry of the disable log has a :guilabel:`Check now` button. It re-checks that redirect: a healthy
 one is enabled again, a broken one stays disabled. A redirect that was disabled by hand is never touched.
 
+Once a redirect is healthy and enabled again - through :guilabel:`Check now`, :guilabel:`Apply` or a bulk run -
+its entries stay in the log as history and are flagged :guilabel:`Repaired` with the time. They offer no actions
+any more; if the redirect breaks again, it gets a new entry.
+
 Suggested target
 ================
 

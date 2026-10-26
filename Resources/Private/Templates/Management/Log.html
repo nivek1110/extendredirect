@@ -60,16 +60,26 @@
                                             </f:for>
                                         </f:then>
                                         <f:else>
-                                            <small class="text-body-secondary"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.none" /></small>
+                                            <f:if condition="{log.repaired}">
+                                                <f:then>
+                                                    <span class="badge badge-success text-bg-success"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.repaired" /></span>
+                                                    <small class="text-body-secondary"><f:format.date format="d.m.Y H:i">@{log.repaired}</f:format.date></small>
+                                                </f:then>
+                                                <f:else>
+                                                    <small class="text-body-secondary"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.none" /></small>
+                                                </f:else>
+                                            </f:if>
                                         </f:else>
                                     </f:if>
                                 </td>
                                 <td class="text-nowrap">
-                                    <a class="btn btn-default btn-sm"
-                                       href="{f:be.uri(route: 'redirect_recheck', parameters: '{redirectUid: log.redirect_uid}')}"
-                                       title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.title')}">
-                                        <core:icon identifier="actions-refresh" /> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.button" />
-                                    </a>
+                                    <f:if condition="{log.repaired} == 0">
+                                        <a class="btn btn-default btn-sm"
+                                           href="{f:be.uri(route: 'redirect_recheck', parameters: '{redirectUid: log.redirect_uid}')}"
+                                           title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.title')}">
+                                            <core:icon identifier="actions-refresh" /> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.button" />
+                                        </a>
+                                    </f:if>
                                     <a class="btn btn-default btn-sm t3js-modal-trigger"
                                        href="{f:be.uri(route: 'redirect_disable_log_delete', parameters: '{logUid: log.uid}')}"
                                        title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.title')}"

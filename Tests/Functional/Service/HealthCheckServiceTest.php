@@ -473,19 +473,78 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame(['*'], $rebuilds->getArrayCopy());
     }
 
-    public function testHealingARedirectRemovesItsDisableLogEntries(): void
+    /**
+     * @return array<int, int> "repaired" timestamp per log entry, by redirect uid, oldest entry first
+     */
+    private function repairedByRedirect(): array
     {
-        $logs = GeneralUtility::makeInstance(DisableLogRepository::class);
+        $result = [];
+        foreach (array_reverse(GeneralUtility::makeInstance(DisableLogRepository::class)->findAll()) as $entry) {
+            $result[(int) $entry['redirect_uid']] = (int) $entry['repaired'];
+        }
+
+        return $result;
+    }
+
+    public function testHealingARedirectKeepsItsDisableLogEntriesAndMarksThemRepaired(): void
+    {
         $uid = $this->insertRedirect('/old', '/later');
         $other = $this->insertRedirect('/other', '/missing');
         $this->subject->runBulkCheck();
-        self::assertSame(2, $logs->countAll());
+        self::assertSame([$uid => 0, $other => 0], $this->repairedByRedirect());
         $this->insertPage('/later');
 
         $this->subject->recheck($uid);
 
-        $remaining = array_column($logs->findAll(), 'redirect_uid');
-        self::assertSame([$other], array_map('intval', $remaining));
+        self::assertSame(2, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll(), 'the log is the history, nothing is deleted');
+        $repaired = $this->repairedByRedirect();
+        self::assertGreaterThan(0, $repaired[$uid]);
+        self::assertSame(0, $repaired[$other], 'only the healed redirect is flagged');
+    }
+
+    public function testABulkRunThatHealsARedirectAlsoMarksItsLogEntriesRepaired(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        $this->insertPage('/later');
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+        self::assertGreaterThan(0, $this->repairedByRedirect()[$uid]);
+    }
+
+    public function testARedirectThatBreaksAgainGetsANewOpenEntryNextToTheRepairedOne(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        $pageUid = $this->insertPage('/later');
+        $this->subject->runBulkCheck();
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['deleted' => 1], ['uid' => $pageUid]);
+
+        $this->subject->runBulkCheck();
+
+        $entries = array_values(array_filter(
+            GeneralUtility::makeInstance(DisableLogRepository::class)->findAll(),
+            static fn(array $entry): bool => (int) $entry['redirect_uid'] === $uid
+        ));
+        self::assertCount(2, $entries);
+        self::assertSame(0, (int) $entries[0]['repaired'], 'newest entry is open');
+        self::assertGreaterThan(0, (int) $entries[1]['repaired'], 'the old one stays repaired');
+    }
+
+    public function testARecheckOfAnAlreadyHealthyRedirectFlagsItsLeftoverEntryRepaired(): void
+    {
+        $this->insertPage('/new');
+        $uid = $this->insertRedirect('/old', '/new');
+        GeneralUtility::makeInstance(DisableLogRepository::class)->add([
+            'pid' => 0, 'crdate' => 1000, 'redirect_uid' => $uid, 'source_host' => '*',
+            'source_path' => '/old', 'target' => '/gone', 'status_code' => '-', 'reason' => 'Page not found',
+        ]);
+
+        $this->subject->recheck($uid);
+
+        self::assertGreaterThan(0, $this->repairedByRedirect()[$uid]);
     }
 
     public function testASecondRecheckOfAHealedRedirectKeepsItEnabled(): void
@@ -499,18 +558,6 @@ class HealthCheckServiceTest extends FunctionalTestCase
 
         self::assertSame(HealthCheckService::RECHECK_HEALTHY, $second['status']);
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
-    }
-
-    public function testABulkRunThatHealsARedirectAlsoRemovesItsLogEntries(): void
-    {
-        $uid = $this->insertRedirect('/old', '/later');
-        $this->subject->runBulkCheck();
-        $this->insertPage('/later');
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
-        self::assertSame(0, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
     }
 
     /**

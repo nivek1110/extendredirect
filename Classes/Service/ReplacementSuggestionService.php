@@ -69,7 +69,7 @@ class ReplacementSuggestionService
     /**
      * Suggestions for the broken redirects among the given disable log entries.
      *
-     * Entries whose redirect is gone, healthy again or was disabled by hand get none. The pages are
+     * Repaired entries and those whose redirect is gone, healthy again or was disabled by hand get none. The pages are
      * loaded once for all entries.
      *
      * @param array<int, array<string, mixed>> $logEntries
@@ -82,6 +82,9 @@ class ReplacementSuggestionService
         $result = [];
 
         foreach ($logEntries as $entry) {
+            if ((int) ($entry['repaired'] ?? 0) > 0) {
+                continue;
+            }
             $redirect = $redirects->findByUid((int) $entry['redirect_uid']);
             if (!is_array($redirect) || (int) $redirect['disabled'] !== 1 || (int) ($redirect['broken_redirect'] ?? 0) !== 1) {
                 continue;

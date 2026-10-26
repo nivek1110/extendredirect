@@ -437,4 +437,20 @@ class ManagementControllerTest extends FunctionalTestCase
         self::assertSame('/produkte/schuhe-neu', $row['target']);
         self::assertSame(1, (int) $row['disabled']);
     }
+
+    public function testARepairedEntryShowsWhenItWasRepairedAndOffersNoActions(): void
+    {
+        $this->createSiteWithPage('/produkte/schuhe');
+        $redirectUid = $this->insertBrokenRedirect('/produkte/schuhe-neu');
+        $this->logRepository->add($this->logEntry($redirectUid) + ['repaired' => 1700049600]);
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleLogRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringContainsString('Repaired', $body);
+        self::assertStringContainsString('15.11.2023', $body);
+        self::assertStringNotContainsString('redirect_recheck', $body);
+        self::assertStringNotContainsString('redirect_apply_suggestion', $body);
+        self::assertStringContainsString('redirect_disable_log_delete', $body, 'the entry itself can still be deleted');
+    }
 }

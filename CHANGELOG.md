@@ -32,15 +32,19 @@ All notable changes to this project are documented here. The format follows
 - Re-enabling or disabling a redirect through a check (bulk run, "Check now", "Apply") now rebuilds the core's redirect
   index. Before, the state was only written to the database: a healed redirect did not redirect on the live site
   until the cache was flushed, and the next check, which requests the source URL, disabled it again.
-- A redirect that is healthy and enabled again is removed from the disable log, so "Check now" can no longer be
-  clicked on a stale entry.
+- The disable log keeps its history: once a redirect is healthy and enabled again (bulk run, "Check now" or
+  "Apply"), its entries are flagged "Repaired" with the time instead of being deleted. Repaired entries offer neither
+  "Check now" nor a suggested target any more, so a stale entry can no longer be used to disable a working redirect.
+  If the redirect breaks again, it gets a new open entry.
 
 ### Changed
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).
 
 ### Upgrade notes
-- No database changes. The new extension settings `notifyWebhookUrl` and `notifyWebhookFormat` are optional; nothing
+- New column `tx_extendredirect_disable_log.repaired`: run the database update (Maintenance > Analyze Database
+  Structure, or `vendor/bin/typo3 database:updateschema` with EXT:typo3_console). Existing log entries count as open until their redirect is checked.
+- The new extension settings `notifyWebhookUrl` and `notifyWebhookFormat` are optional; nothing
   changes until you set a webhook URL. Flush the caches (the new event class is excluded from dependency injection).
 
 ## [1.1.2] - 2026-10-26

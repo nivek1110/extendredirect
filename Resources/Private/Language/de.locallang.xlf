@@ -398,6 +398,10 @@
                 <source>The chosen page does not exist (anymore). The redirect was not changed.</source>
                 <target>Die gewählte Seite existiert (nicht mehr). Der Redirect wurde nicht geändert.</target>
             </trans-unit>
+            <trans-unit id="log.repaired">
+                <source>Repaired</source>
+                <target>Repariert</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>
