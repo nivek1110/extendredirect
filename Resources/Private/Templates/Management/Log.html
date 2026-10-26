@@ -31,7 +31,6 @@
                             <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.target" /></th>
                             <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.redirectCount" /></th>
                             <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.reason" /></th>
-                            <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.table.suggestion" /></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -44,42 +43,7 @@
                                 <td>{log.target -> f:format.crop(maxCharacters: 100)}</td>
                                 <td>{log.status_code}</td>
                                 <td>{log.reason}</td>
-                                <td>
-                                    <f:if condition="{suggestions.{log.uid}}">
-                                        <f:then>
-                                            <f:for each="{suggestions.{log.uid}}" as="suggestion">
-                                                <div class="text-nowrap">
-                                                    <a class="btn btn-default btn-sm"
-                                                       href="{f:be.uri(route: 'redirect_apply_suggestion', parameters: '{redirectUid: log.redirect_uid, pageUid: suggestion.uid}')}"
-                                                       title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.apply.title')}">
-                                                        <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.apply" />
-                                                    </a>
-                                                    {suggestion.title -> f:format.crop(maxCharacters: 40)}
-                                                    <small class="text-body-secondary"><f:if condition="{suggestion.showHost}">{suggestion.host}</f:if>{suggestion.slug -> f:format.crop(maxCharacters: 60)} · {suggestion.score}&nbsp;%</small>
-                                                </div>
-                                            </f:for>
-                                        </f:then>
-                                        <f:else>
-                                            <f:if condition="{log.repaired}">
-                                                <f:then>
-                                                    <span class="badge badge-success text-bg-success"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.repaired" /></span>
-                                                    <small class="text-body-secondary"><f:format.date format="d.m.Y H:i">@{log.repaired}</f:format.date></small>
-                                                </f:then>
-                                                <f:else>
-                                                    <small class="text-body-secondary"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.suggestion.none" /></small>
-                                                </f:else>
-                                            </f:if>
-                                        </f:else>
-                                    </f:if>
-                                </td>
                                 <td class="text-nowrap">
-                                    <f:if condition="{log.repaired} == 0">
-                                        <a class="btn btn-default btn-sm"
-                                           href="{f:be.uri(route: 'redirect_recheck', parameters: '{redirectUid: log.redirect_uid}')}"
-                                           title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.title')}">
-                                            <core:icon identifier="actions-refresh" /> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.button" />
-                                        </a>
-                                    </f:if>
                                     <a class="btn btn-default btn-sm t3js-modal-trigger"
                                        href="{f:be.uri(route: 'redirect_disable_log_delete', parameters: '{logUid: log.uid}')}"
                                        title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.title')}"

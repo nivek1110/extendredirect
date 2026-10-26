@@ -12,17 +12,6 @@ All notable changes to this project are documented here. The format follows
   days), so you can see whether the Scheduler actually runs.
 - Redirects module: an "Export redirects" button downloads all redirects as CSV in the import format, so an export
   can be edited and imported again. The CSV import accepts the optional columns `is_regexp` and `disabled` too.
-- Disable log: a "Check now" button per entry re-checks that redirect on demand. A healthy one is enabled again,
-  a broken one stays disabled; redirects disabled by hand are never touched.
-- Disable log: a "Suggested target" column proposes up to three existing pages whose slug resembles the broken
-  target (or the nearest existing parent page), with a similarity score. "Apply" sets the page as the new target
-  and re-checks the redirect, which enables it again if healthy. Redirects disabled by hand get no suggestion.
-  With several sites or languages the suggestions stay inside the site(s) of the redirect's source host (every site
-  for `*`, with the host shown) and inside the language of the target: a language prefix such as `/en/`, or a language
-  with a domain of its own, selects the translated pages, otherwise the default language is used. A redirect whose
-  target is a page link (typical after the page delete/hide protection disabled it) is matched by the former slug and
-  language of that page, which is looked up even if the page is deleted or hidden; that page itself is never
-  suggested. If the page is gone for good (recycler emptied) there is nothing to compare and no suggestion.
 - PSR-14 event `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`, dispatched for every redirect the health check
   or the page delete/hide guard disables, so your own code can react to it.
 - Optional webhook for disabled redirects: the extension settings `notifyWebhookUrl` and `notifyWebhookFormat`
@@ -43,25 +32,18 @@ All notable changes to this project are documented here. The format follows
 - `request` check mode: an exception from the frontend (for example a site without TypoScript, "No page configured
   for type=0") no longer aborts the whole bulk run; it counts as a server error of that one redirect.
 - `request` check mode: a disabled (auto-disabled) redirect could never heal. The core ignores disabled redirects, so
-  its source URL always answered 404 and the check stayed "broken" even after the target was fixed - in the bulk run,
-  with "Check now" and with the new "Apply". Disabled redirects are now checked via their target (page link,
-  same-site path); a target on another host is left alone, as in `database` mode.
-
-- Re-enabling or disabling a redirect through a check (bulk run, "Check now", "Apply") now rebuilds the core's redirect
+  its source URL always answered 404 and the check stayed "broken" even after the target was fixed. Disabled
+  redirects are now checked via their target (page link, same-site path); a target on another host is left alone, as
+  in `database` mode.
+- Re-enabling or disabling a redirect through a check (bulk run) now rebuilds the core's redirect
   index. Before, the state was only written to the database: a healed redirect did not redirect on the live site
   until the cache was flushed, and the next check, which requests the source URL, disabled it again.
-- The disable log keeps its history: once a redirect is healthy and enabled again (bulk run, "Check now" or
-  "Apply"), its entries are flagged "Repaired" with the time instead of being deleted. Repaired entries offer neither
-  "Check now" nor a suggested target any more, so a stale entry can no longer be used to disable a working redirect.
-  If the redirect breaks again, it gets a new open entry.
 
 ### Changed
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).
 
 ### Upgrade notes
-- New column `tx_extendredirect_disable_log.repaired`: run the database update (Maintenance > Analyze Database
-  Structure, or `vendor/bin/typo3 database:updateschema` with EXT:typo3_console). Existing log entries count as open until their redirect is checked.
 - The new extension settings `notifyWebhookUrl` and `notifyWebhookFormat` are optional; nothing
   changes until you set a webhook URL. Flush the caches (the new event class is excluded from dependency injection).
 

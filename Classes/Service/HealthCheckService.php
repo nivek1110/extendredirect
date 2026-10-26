@@ -40,12 +40,6 @@ class HealthCheckService
 
     private const MAX_CHAIN_HOPS = 10;
 
-    public const RECHECK_NOT_FOUND = 'notFound';
-    public const RECHECK_MANUALLY_DISABLED = 'manuallyDisabled';
-    public const RECHECK_HEALTHY = 'healthy';
-    public const RECHECK_BROKEN = 'broken';
-    public const RETARGET_PAGE_NOT_FOUND = 'pageNotFound';
-
     /**
      * Context aspects the frontend sub-request may overwrite and that the surrounding
      * (backend) request must get back unchanged - see redirectFollower().
@@ -80,65 +74,6 @@ class HealthCheckService
         $this->runBulkCheck();
 
         return null;
-    }
-
-    /**
-     * Re-checks a single redirect on demand (the "Check now" button of the disable log).
-     *
-     * A healthy one is enabled again, a broken one stays (or becomes) disabled. A redirect an editor
-     * disabled by hand is never touched, same as in a bulk run.
-     *
-     * @return array{status: string, message: string}
-     * @throws Exception
-     */
-    public function recheck(int $uid): array
-    {
-        $redirect = GeneralUtility::makeInstance(RedirectRepository::class)->findByUid($uid);
-        if (!is_array($redirect)) {
-            return ['status' => self::RECHECK_NOT_FOUND, 'message' => ''];
-        }
-        if ((int) $redirect['disabled'] === 1 && (int) ($redirect['broken_redirect'] ?? 0) === 0) {
-            return ['status' => self::RECHECK_MANUALLY_DISABLED, 'message' => ''];
-        }
-
-        $check = $this->checkRedirect($redirect);
-        $this->updateRedirect($redirect, $check);
-        if (!$check['redirectError']) {
-            // Also covers a redirect that is healthy already but still has an open entry from before.
-            $this->markLogEntriesRepaired($uid);
-        }
-        GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
-
-        return [
-            'status' => $check['redirectError'] ? self::RECHECK_BROKEN : self::RECHECK_HEALTHY,
-            'message' => (string) ($check['message'] ?? ''),
-        ];
-    }
-
-    /**
-     * Points a broken redirect at an existing page (a suggestion of the disable log) and re-checks it, so a
-     * healthy result enables it again. Same refusals as recheck(), plus a page that does not exist.
-     *
-     * @return array{status: string, message: string}
-     * @throws Exception
-     */
-    public function retarget(int $uid, int $pageUid): array
-    {
-        $repository = GeneralUtility::makeInstance(RedirectRepository::class);
-        $redirect = $repository->findByUid($uid);
-        if (!is_array($redirect)) {
-            return ['status' => self::RECHECK_NOT_FOUND, 'message' => ''];
-        }
-        if ((int) $redirect['disabled'] === 1 && (int) ($redirect['broken_redirect'] ?? 0) === 0) {
-            return ['status' => self::RECHECK_MANUALLY_DISABLED, 'message' => ''];
-        }
-        if (!$this->pageExists($pageUid)) {
-            return ['status' => self::RETARGET_PAGE_NOT_FOUND, 'message' => ''];
-        }
-
-        $repository->updateTarget($uid, $this->toPageTypolink($pageUid));
-
-        return $this->recheck($uid);
     }
 
     /**
@@ -294,24 +229,9 @@ class HealthCheckService
             // source URL, wrongly finds it broken again - and a disabled one keeps redirecting.
             GeneralUtility::makeInstance(RedirectCacheService::class)->rebuildForHost((string) ($redirect['source_host'] ?? '*'));
         }
-        if ($wasDisabled && !$isDisabled) {
-            $this->markLogEntriesRepaired((int) $redirect['uid']);
-        }
 
         $persistanceManager = GeneralUtility::makeInstance(PersistenceManager::class);
         $persistanceManager->persistAll();
-    }
-
-    /**
-     * The disable log is the history of what was disabled when: a healed redirect keeps its entries, flagged
-     * as repaired, instead of losing them.
-     */
-    protected function markLogEntriesRepaired(int $redirectUid): void
-    {
-        GeneralUtility::makeInstance(DisableLogRepository::class)->markRepairedByRedirectUid(
-            $redirectUid,
-            (int) GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp')
-        );
     }
 
     /**

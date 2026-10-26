@@ -35,12 +35,7 @@ up unnoticed.
   you can list exactly the redirects that need attention.
 - **Disable log** — a dedicated log view lists every redirect the health check (or the page-guard)
   has disabled, with the reason, source, target and timestamp — so nothing gets disabled silently.
-  Entries can be deleted individually or all at once. A "Check now" button per entry re-checks that
-  redirect on demand: a healthy one is enabled again, a broken one stays disabled (redirects you
-  disabled by hand are never touched). Entries of redirects that are healthy again stay in the log as
-  history, flagged "Repaired" with the time, and offer no actions. A "Suggested target" column proposes up to three existing pages
-  that resemble the broken target (or its nearest existing parent page), within the site and language of
-  the redirect; "Apply" makes one the new target and re-checks the redirect.
+  Entries can be deleted individually or all at once.
 - **Last checked** — the overview shows when each redirect was last checked and can filter for
   never-checked redirects or ones not checked for 1, 7 or 30 days, so you can see whether the
   Scheduler actually runs.

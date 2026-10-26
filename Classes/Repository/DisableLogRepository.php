@@ -94,25 +94,6 @@ class DisableLogRepository
     }
 
     /**
-     * Flags the still open entries of a redirect as repaired - it is healthy and enabled again. The entries
-     * stay in the log as history, they just no longer offer to repair anything.
-     *
-     * @throws \Doctrine\DBAL\Exception
-     */
-    public function markRepairedByRedirectUid(int $redirectUid, int $timestamp): void
-    {
-        $queryBuilder = $this->getQueryBuilder();
-        $queryBuilder
-            ->update(self::TABLE)
-            ->set('repaired', $timestamp)
-            ->where(
-                $queryBuilder->expr()->eq('redirect_uid', $queryBuilder->createNamedParameter($redirectUid, ParameterType::INTEGER)),
-                $queryBuilder->expr()->eq('repaired', 0)
-            )
-            ->executeStatement();
-    }
-
-    /**
      * @throws \Doctrine\DBAL\Exception
      */
     public function deleteAll(): void

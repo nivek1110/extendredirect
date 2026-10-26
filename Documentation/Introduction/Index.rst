@@ -22,8 +22,7 @@ Features
     with a logged reason.
 *   **Broken-redirect filter** in the Redirects module.
 *   **Last checked** column and filter in the Redirects module.
-*   **Disable log** - reason, source, target and timestamp of every automatic disabling, with a
-    "Check now" button and suggested replacement targets per entry.
+*   **Disable log** - reason, source, target and timestamp of every automatic disabling.
 *   **CSV import and export** - semicolon-separated, with validation of hosts and duplicate source
     paths; an export can be edited and imported again.
 *   **Email notification** (optional) - a mail when a redirect is disabled, as one summary mail per

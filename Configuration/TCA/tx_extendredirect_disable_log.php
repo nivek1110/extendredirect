@@ -20,10 +20,8 @@ return [
         'target' => ['config' => ['type' => 'input', 'readOnly' => true, 'max' => 2048]],
         'status_code' => ['config' => ['type' => 'input', 'readOnly' => true, 'max' => 255]],
         'reason' => ['config' => ['type' => 'text', 'readOnly' => true]],
-        // Timestamp of the check that made the redirect healthy again; 0 = still open.
-        'repaired' => ['config' => ['type' => 'number', 'readOnly' => true]],
     ],
     'types' => [
-        '0' => ['showitem' => 'source_host, source_path, target, status_code, reason, repaired'],
+        '0' => ['showitem' => 'source_host, source_path, target, status_code, reason'],
     ],
 ];

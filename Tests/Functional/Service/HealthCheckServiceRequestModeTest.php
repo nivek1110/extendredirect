@@ -328,16 +328,30 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertTrue($context->getAspect('backend.user')->isLoggedIn());
     }
 
+    /**
+     * Runs the bulk check and reports whether the redirect ended up enabled ("healthy") or disabled ("broken").
+     *
+     * @return array{status: string}
+     */
+    private function check(HealthCheckService $service, int $uid): array
+    {
+        $service->runBulkCheck();
+        $row = $this->redirects->findByUid($uid);
+        self::assertIsArray($row);
+
+        return ['status' => (int) $row['disabled'] === 0 ? 'healthy' : 'broken'];
+    }
+
     public function testADisabledBrokenRedirectIsCheckedViaItsTargetAndHealedOnceItExists(): void
     {
         $pageUid = $this->insertPage($this->rootUid, '/new');
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://example.com/new' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
         // The core ignores disabled redirects, so the source URL would 404 forever: the target is what counts.
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://example.com/new'], $this->requestedUrls->getArrayCopy());
         $row = $this->redirects->findByUid($uid);
         self::assertIsArray($row);
@@ -350,9 +364,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', '/missing', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService([]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame('broken', $result['status']);
         self::assertSame(['https://example.com/missing'], $this->requestedUrls->getArrayCopy());
         $row = $this->redirects->findByUid($uid);
         self::assertIsArray($row);
@@ -364,9 +378,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=9999', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService([]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame('broken', $result['status']);
         self::assertSame([], $this->requestedUrls->getArrayCopy());
     }
 
@@ -375,9 +389,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 'https://other.example/page', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService([]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame([], $this->requestedUrls->getArrayCopy());
     }
 
@@ -420,9 +434,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/new' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://other.example/new'], $this->requestedUrls->getArrayCopy());
     }
 
@@ -433,9 +447,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/en/new' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://other.example/en/new'], $this->requestedUrls->getArrayCopy());
     }
 
@@ -447,9 +461,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $german, ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://other.example/de/neu'], $this->requestedUrls->getArrayCopy());
     }
 
@@ -459,9 +473,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 'https://other.example/landing', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/landing' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://other.example/landing'], $this->requestedUrls->getArrayCopy());
     }
 
@@ -509,9 +523,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&' . $parameter, ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame('healthy', $result['status']);
         self::assertSame(['https://other.example/de/neu'], $this->requestedUrls->getArrayCopy());
         $row = $this->redirects->findByUid($uid);
         self::assertIsArray($row);
@@ -525,9 +539,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
         $service = $this->createService([]);
 
-        $result = $service->recheck($uid);
+        $result = $this->check($service, $uid);
 
-        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame('broken', $result['status']);
         self::assertSame([], $this->requestedUrls->getArrayCopy(), 'no URL exists for the missing translation');
     }
 

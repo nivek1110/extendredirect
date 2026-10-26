@@ -9,29 +9,6 @@ Usage
 The Redirects module (:guilabel:`Link Management > Redirects`) gains the broken-redirect
 filter, a "last checked" column and filter, the CSV import and export and the disable log.
 
-Disable log: check now
-======================
-
-Every entry of the disable log has a :guilabel:`Check now` button. It re-checks that redirect: a healthy
-one is enabled again, a broken one stays disabled. A redirect that was disabled by hand is never touched.
-
-Once a redirect is healthy and enabled again - through :guilabel:`Check now`, :guilabel:`Apply` or a bulk run -
-its entries stay in the log as history and are flagged :guilabel:`Repaired` with the time. They offer no actions
-any more; if the redirect breaks again, it gets a new entry.
-
-Suggested target
-================
-
-For every broken redirect the disable log proposes up to three existing, visible pages (standard pages and shortcuts) whose slug resembles the path the redirect pointed at, with a similarity score
-in percent. With several sites or languages they stay inside the site(s) of the redirect's source host (every site
-for `*`, the host is shown) and inside the language of the target: a language prefix such as `/en/`, or a language
-with a domain of its own, selects the translated pages. A redirect whose target is a page link (the usual case after the page delete/hide protection disabled it) is
-matched by the former slug and language of that page, even if it is deleted or hidden; that page itself is
-never suggested, and if it is gone for good there is no suggestion. If no page has a similar slug, the nearest existing parent page is offered instead.
-:guilabel:`Apply` sets the chosen page (as :php:`t3://page?uid=...`) as the new target and re-checks the
-redirect; a healthy redirect is enabled again. Nothing is ever applied automatically, and redirects that were
-disabled by hand get no suggestion.
-
 CSV export
 ==========
 

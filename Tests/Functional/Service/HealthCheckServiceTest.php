@@ -322,104 +322,16 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame([['uid' => $uid, 'newlyDisabled' => true]], $this->uidsAndFlag($result['broken']));
     }
 
-    public function testRecheckReenablesABrokenRedirectOnceItsTargetExists(): void
-    {
-        $uid = $this->insertRedirect('/old', '/later');
-        $this->subject->runBulkCheck();
-        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
-        $this->insertPage('/later');
-
-        $result = $this->subject->recheck($uid);
-
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
-        $row = $this->redirect($uid);
-        self::assertSame(0, (int) $row['disabled']);
-        self::assertSame(0, (int) $row['broken_redirect']);
-    }
-
-    public function testRecheckKeepsAStillBrokenRedirectDisabledWithoutLoggingAgain(): void
+    public function testAStillBrokenRedirectStaysDisabledAndIsNotLoggedAgain(): void
     {
         $uid = $this->insertRedirect('/old', '/missing');
         $this->subject->runBulkCheck();
         $logged = GeneralUtility::makeInstance(DisableLogRepository::class)->countAll();
 
-        $result = $this->subject->recheck($uid);
+        $this->subject->runBulkCheck();
 
-        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
-        self::assertNotSame('', $result['message']);
         self::assertSame(1, (int) $this->redirect($uid)['disabled']);
         self::assertSame($logged, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
-    }
-
-    public function testRecheckRefusesARedirectThatWasDisabledByHand(): void
-    {
-        $this->insertPage('/new');
-        $uid = $this->insertRedirect('/old', '/new', ['disabled' => 1]);
-
-        $result = $this->subject->recheck($uid);
-
-        self::assertSame(HealthCheckService::RECHECK_MANUALLY_DISABLED, $result['status']);
-        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
-    }
-
-    public function testRecheckReportsAnUnknownRedirect(): void
-    {
-        self::assertSame(HealthCheckService::RECHECK_NOT_FOUND, $this->subject->recheck(9999)['status']);
-    }
-
-    public function testRecheckDisablesAndLogsAnEnabledRedirectThatBrokeMeanwhile(): void
-    {
-        $uid = $this->insertRedirect('/old', '/missing');
-
-        $result = $this->subject->recheck($uid);
-
-        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
-        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
-        self::assertSame(1, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
-    }
-
-    public function testRetargetPointsABrokenRedirectAtTheChosenPageAndReenablesIt(): void
-    {
-        $uid = $this->insertRedirect('/old', '/missing');
-        $this->subject->runBulkCheck();
-        $pageUid = $this->insertPage('/replacement');
-
-        $result = $this->subject->retarget($uid, $pageUid);
-
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
-        $row = $this->redirect($uid);
-        self::assertSame('t3://page?uid=' . $pageUid, $row['target']);
-        self::assertSame(0, (int) $row['disabled']);
-        self::assertSame(0, (int) $row['broken_redirect']);
-    }
-
-    public function testRetargetRefusesAMissingPageAndKeepsTheTarget(): void
-    {
-        $uid = $this->insertRedirect('/old', '/missing');
-        $this->subject->runBulkCheck();
-
-        $result = $this->subject->retarget($uid, 9999);
-
-        self::assertSame(HealthCheckService::RETARGET_PAGE_NOT_FOUND, $result['status']);
-        self::assertSame('/missing', $this->redirect($uid)['target']);
-    }
-
-    public function testRetargetRefusesARedirectDisabledByHand(): void
-    {
-        $pageUid = $this->insertPage('/replacement');
-        $uid = $this->insertRedirect('/old', '/missing', ['disabled' => 1]);
-
-        $result = $this->subject->retarget($uid, $pageUid);
-
-        self::assertSame(HealthCheckService::RECHECK_MANUALLY_DISABLED, $result['status']);
-        self::assertSame('/missing', $this->redirect($uid)['target']);
-    }
-
-    public function testRetargetReportsAnUnknownRedirect(): void
-    {
-        $pageUid = $this->insertPage('/replacement');
-
-        self::assertSame(HealthCheckService::RECHECK_NOT_FOUND, $this->subject->retarget(9999, $pageUid)['status']);
     }
 
     /**
@@ -457,7 +369,7 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $this->insertPage('/later');
         $rebuilds = $this->spyOnRedirectIndexRebuilds();
 
-        $this->subject->recheck($uid);
+        $this->subject->runBulkCheck();
 
         // The state is written with plain SQL; without a rebuild the frontend keeps its stale index, the
         // healed redirect never fires and the next check wrongly sees it as broken again.
@@ -474,48 +386,20 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame(['*'], $rebuilds->getArrayCopy());
     }
 
-    /**
-     * @return array<int, int> "repaired" timestamp per log entry, by redirect uid, oldest entry first
-     */
-    private function repairedByRedirect(): array
-    {
-        $result = [];
-        foreach (array_reverse(GeneralUtility::makeInstance(DisableLogRepository::class)->findAll()) as $entry) {
-            $result[(int) $entry['redirect_uid']] = (int) $entry['repaired'];
-        }
-
-        return $result;
-    }
-
-    public function testHealingARedirectKeepsItsDisableLogEntriesAndMarksThemRepaired(): void
+    public function testHealingARedirectKeepsItsDisableLogEntries(): void
     {
         $uid = $this->insertRedirect('/old', '/later');
-        $other = $this->insertRedirect('/other', '/missing');
-        $this->subject->runBulkCheck();
-        self::assertSame([$uid => 0, $other => 0], $this->repairedByRedirect());
-        $this->insertPage('/later');
-
-        $this->subject->recheck($uid);
-
-        self::assertSame(2, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll(), 'the log is the history, nothing is deleted');
-        $repaired = $this->repairedByRedirect();
-        self::assertGreaterThan(0, $repaired[$uid]);
-        self::assertSame(0, $repaired[$other], 'only the healed redirect is flagged');
-    }
-
-    public function testABulkRunThatHealsARedirectAlsoMarksItsLogEntriesRepaired(): void
-    {
-        $uid = $this->insertRedirect('/old', '/later');
+        $this->insertRedirect('/other', '/missing');
         $this->subject->runBulkCheck();
         $this->insertPage('/later');
 
         $this->subject->runBulkCheck();
 
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
-        self::assertGreaterThan(0, $this->repairedByRedirect()[$uid]);
+        self::assertSame(2, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll(), 'the log is the history, nothing is deleted');
     }
 
-    public function testARedirectThatBreaksAgainGetsANewOpenEntryNextToTheRepairedOne(): void
+    public function testARedirectThatBreaksAgainGetsANewLogEntry(): void
     {
         $uid = $this->insertRedirect('/old', '/later');
         $this->subject->runBulkCheck();
@@ -525,39 +409,22 @@ class HealthCheckServiceTest extends FunctionalTestCase
 
         $this->subject->runBulkCheck();
 
-        $entries = array_values(array_filter(
+        $entries = array_filter(
             GeneralUtility::makeInstance(DisableLogRepository::class)->findAll(),
             static fn(array $entry): bool => (int) $entry['redirect_uid'] === $uid
-        ));
+        );
         self::assertCount(2, $entries);
-        self::assertSame(0, (int) $entries[0]['repaired'], 'newest entry is open');
-        self::assertGreaterThan(0, (int) $entries[1]['repaired'], 'the old one stays repaired');
     }
 
-    public function testARecheckOfAnAlreadyHealthyRedirectFlagsItsLeftoverEntryRepaired(): void
-    {
-        $this->insertPage('/new');
-        $uid = $this->insertRedirect('/old', '/new');
-        GeneralUtility::makeInstance(DisableLogRepository::class)->add([
-            'pid' => 0, 'crdate' => 1000, 'redirect_uid' => $uid, 'source_host' => '*',
-            'source_path' => '/old', 'target' => '/gone', 'status_code' => '-', 'reason' => 'Page not found',
-        ]);
-
-        $this->subject->recheck($uid);
-
-        self::assertGreaterThan(0, $this->repairedByRedirect()[$uid]);
-    }
-
-    public function testASecondRecheckOfAHealedRedirectKeepsItEnabled(): void
+    public function testAHealedRedirectStaysEnabledOnTheNextRun(): void
     {
         $uid = $this->insertRedirect('/old', '/later');
         $this->subject->runBulkCheck();
         $this->insertPage('/later');
 
-        $this->subject->recheck($uid);
-        $second = $this->subject->recheck($uid);
+        $this->subject->runBulkCheck();
+        $this->subject->runBulkCheck();
 
-        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $second['status']);
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
     }
 
