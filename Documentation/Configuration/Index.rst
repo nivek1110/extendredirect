@@ -65,7 +65,7 @@ Webhook
 =======
 
 Instead of or in addition to the mail, the same notification can be posted as JSON to a webhook. It
-needs :confval:`notifyOnDisable` and follows :confval:`notifyMode` (one call per run or per redirect).
+needs `notifyOnDisable` and follows `notifyMode` (one call per run or per redirect).
 
 ..  confval:: notifyWebhookUrl
     :name: confval-notifywebhookurl
