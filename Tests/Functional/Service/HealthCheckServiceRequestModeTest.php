@@ -264,6 +264,20 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertCount(2, $this->requestedUrls);
     }
 
+    public function testRegexRedirectIsCheckedAgainstTargetPageNotSourceUrl(): void
+    {
+        $this->insertPage($this->rootUid, '/new');
+        $healthy = $this->insertRedirect('#^/legacy$#', '/new', ['is_regexp' => 1]);
+        $broken = $this->insertRedirect('#^/other$#', '/does-not-exist', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($healthy)['disabled']);
+        self::assertSame(1, (int) $this->redirect($broken)['disabled']);
+        self::assertCount(0, $this->requestedUrls);
+    }
+
     public function testDryRunDoesNotPersistRequestModeResult(): void
     {
         $uid = $this->insertRedirect('/old', '/gone');
@@ -671,6 +685,36 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame('t3://page?uid=' . $german, $this->redirect($uid)['target'], 'the translation, so the link stays German');
     }
 
+    public function testARegexRedirectTargetWithALanguagePrefixIsFoundInThatLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/produkte');
+        $this->insertPageInSite($otherRoot, '/produkte', 1, $english);
+        $translated = $this->insertRedirect('#^/legacy$#', '/de/produkte', ['is_regexp' => 1, 'source_host' => 'other.example']);
+        $untranslated = $this->insertRedirect('#^/legacy2$#', '/de/gibts-nicht', ['is_regexp' => 1, 'source_host' => 'other.example']);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($translated)['disabled']);
+        self::assertSame(1, (int) $this->redirect($untranslated)['disabled']);
+        self::assertCount(0, $this->requestedUrls);
+    }
+
+    public function testARegexRedirectToAHiddenPageOrAnExternalSite(): void
+    {
+        $page = $this->insertPage($this->rootUid, '/hidden-page');
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['hidden' => 1], ['uid' => $page]);
+        $toHidden = $this->insertRedirect('#^/a$#', 't3://page?uid=' . $page, ['is_regexp' => 1]);
+        $toExternal = $this->insertRedirect('#^/b$#', 'https://elsewhere.example/page', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($toHidden)['disabled'], 'a hidden page is not there for visitors');
+        self::assertSame(0, (int) $this->redirect($toExternal)['disabled'], 'an external target cannot be checked and is left alone');
+    }
+
     public function testADisabledRedirectToAPageThatOnlyExistsInOneLanguageIsRequestedInThatLanguage(): void
     {
         $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['fallbackType' => 'free']);
@@ -680,47 +724,5 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
         self::assertSame('healthy', $this->check($service, $uid)['status']);
         self::assertSame(['https://other.example/de/nur-deutsch'], $this->requestedUrls->getArrayCopy());
-    }
-
-    public function testARegexRedirectIsNeverCheckedNotEvenItsTarget(): void
-    {
-        $pageUid = $this->insertPage($this->rootUid, '/hidden-page');
-        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['hidden' => 1], ['uid' => $pageUid]);
-        $brokenPath = $this->insertRedirect('#^/a$#', '/does-not-exist', ['is_regexp' => 1]);
-        $brokenLink = $this->insertRedirect('#^/b$#', 't3://page?uid=' . $pageUid, ['is_regexp' => 1]);
-        $dynamic = $this->insertRedirect('#^/c/(.*)$#', '/gone/$1', ['is_regexp' => 1]);
-        $service = $this->createService([]);
-
-        $service->runBulkCheck();
-
-        foreach ([$brokenPath, $brokenLink, $dynamic] as $uid) {
-            $row = $this->redirect($uid);
-            self::assertSame(0, (int) $row['disabled'], 'a regex redirect cannot be verified, so it is never disabled');
-        }
-        self::assertSame('/does-not-exist', $this->redirect($brokenPath)['target'], 'and its target is never rewritten');
-        self::assertCount(0, $this->requestedUrls);
-        self::assertSame(0, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
-    }
-
-    public function testARegexRedirectThatAnEarlierVersionDisabledIsEnabledAgain(): void
-    {
-        $uid = $this->insertRedirect('#^/a$#', '/does-not-exist', ['is_regexp' => 1, 'disabled' => 1, 'broken_redirect' => 1]);
-        $service = $this->createService([]);
-
-        $service->runBulkCheck();
-
-        $row = $this->redirect($uid);
-        self::assertSame(0, (int) $row['disabled']);
-        self::assertSame(0, (int) $row['broken_redirect']);
-    }
-
-    public function testARegexRedirectDisabledByHandStaysDisabled(): void
-    {
-        $uid = $this->insertRedirect('#^/a$#', '/new', ['is_regexp' => 1, 'disabled' => 1]);
-        $service = $this->createService([]);
-
-        $service->runBulkCheck();
-
-        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
     }
 }
