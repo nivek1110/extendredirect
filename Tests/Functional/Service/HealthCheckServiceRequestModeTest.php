@@ -650,4 +650,68 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame('healthy', $this->check($service, $uid)['status']);
         self::assertSame(['https://other.example/de/impressum'], $this->requestedUrls->getArrayCopy());
     }
+
+    public function testARewrittenTargetPointsAtThePageOfTheRequestedSiteNotAtTheSameSlugElsewhere(): void
+    {
+        $this->insertPage($this->rootUid, '/new'); // same slug on the main site
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/');
+        $otherPage = $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', '/new', ['source_host' => 'other.example']);
+        $service = $this->createService([
+            'https://other.example/old' => $this->redirectTo('https://other.example/new'),
+            'https://other.example/new' => $this->responseWithStatus(200),
+        ]);
+
+        $service->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('t3://page?uid=' . $otherPage, $row['target']);
+    }
+
+    public function testARewrittenTargetKeepsTheLanguageOfTheFinalUrl(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $german = $this->insertPageInSite($otherRoot, '/neu', 1, $english);
+        $uid = $this->insertRedirect('/old', '/de/neu', ['source_host' => 'other.example']);
+        $service = $this->createService([
+            'https://other.example/old' => $this->redirectTo('https://other.example/de/neu'),
+            'https://other.example/de/neu' => $this->responseWithStatus(200),
+        ]);
+
+        $service->runBulkCheck();
+
+        self::assertSame('t3://page?uid=' . $german, $this->redirect($uid)['target'], 'the translation, so the link stays German');
+    }
+
+    public function testARegexRedirectTargetWithALanguagePrefixIsFoundInThatLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/produkte');
+        $this->insertPageInSite($otherRoot, '/produkte', 1, $english);
+        $translated = $this->insertRedirect('#^/legacy$#', '/de/produkte', ['is_regexp' => 1, 'source_host' => 'other.example']);
+        $untranslated = $this->insertRedirect('#^/legacy2$#', '/de/gibts-nicht', ['is_regexp' => 1, 'source_host' => 'other.example']);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($translated)['disabled']);
+        self::assertSame(1, (int) $this->redirect($untranslated)['disabled']);
+        self::assertCount(0, $this->requestedUrls);
+    }
+
+    public function testARegexRedirectToAHiddenPageOrAnExternalSite(): void
+    {
+        $page = $this->insertPage($this->rootUid, '/hidden-page');
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['hidden' => 1], ['uid' => $page]);
+        $toHidden = $this->insertRedirect('#^/a$#', 't3://page?uid=' . $page, ['is_regexp' => 1]);
+        $toExternal = $this->insertRedirect('#^/b$#', 'https://elsewhere.example/page', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($toHidden)['disabled'], 'a hidden page is not there for visitors');
+        self::assertSame(0, (int) $this->redirect($toExternal)['disabled'], 'an external target cannot be checked and is left alone');
+    }
 }

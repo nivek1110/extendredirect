@@ -51,7 +51,7 @@ class DataHandlerHook
 
         if ($table === 'pages' && $status === 'update' && array_key_exists('hidden', $fieldArray) && (int) $fieldArray['hidden'] === 1) {
             GeneralUtility::makeInstance(PageRedirectGuardService::class)
-                ->disableRedirectsTargetingPageAndTranslations((int) $id, 'healthCheck.targetPageHidden');
+                ->disableRedirectsTargetingPageTree((int) $id, 'healthCheck.targetPageHidden');
         }
     }
 
@@ -69,6 +69,6 @@ class DataHandlerHook
         }
 
         GeneralUtility::makeInstance(PageRedirectGuardService::class)
-            ->disableRedirectsTargetingPage($id, 'healthCheck.targetPageDeleted');
+            ->disableRedirectsTargetingPageTree($id, 'healthCheck.targetPageDeleted');
     }
 }

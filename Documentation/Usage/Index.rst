@@ -29,6 +29,14 @@ The disable log is a history: an entry stays when its redirect is healed, and a 
 a new entry. When a check changes the state of a redirect, the core's redirect index is rebuilt, so an enabled
 redirect works on the live site right away and a disabled one stops redirecting.
 
+Regex redirects
+===============
+
+A regex source (`is_regexp`) has no concrete URL, so there is nothing to request: only the **target** is checked,
+and only if it is concrete - a page link or a path that must resolve to a visible page in its site and language, or
+a target on another host, which is left alone. A target with a capture group (:php:`/new/$1`) cannot be verified and
+counts as healthy; the pattern itself is not tested either.
+
 Several sites and languages
 ===========================
 

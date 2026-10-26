@@ -5,7 +5,7 @@ namespace Nivek1110\Extendredirect\Service;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use Doctrine\DBAL\ParameterType;
+use Doctrine\DBAL\ArrayParameterType;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -36,14 +36,15 @@ class PageRedirectGuardService
     }
 
     /**
-     * Same for a page that is hidden: its translations are not reachable any more either, and DataHandler does
-     * not hide them with it (unlike deleting, where it deletes them and the delete hook fires for each).
+     * Same for a page that is deleted or hidden together with everything below it: its translations and all of
+     * its subpages (with their translations). DataHandler fires the delete hook for the page only, and a hidden
+     * page takes its subpages and translations out of the frontend without touching them.
      */
-    public function disableRedirectsTargetingPageAndTranslations(int $pageUid, string $reasonKey): void
+    public function disableRedirectsTargetingPageTree(int $pageUid, string $reasonKey): void
     {
         $this->disableForPage($pageUid, $reasonKey);
-        foreach ($this->findTranslationUids($pageUid) as $translationUid) {
-            $this->disableForPage($translationUid, $reasonKey);
+        foreach ($this->findTreeUids($pageUid) as $uid) {
+            $this->disableForPage($uid, $reasonKey);
         }
 
         GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
@@ -68,19 +69,42 @@ class PageRedirectGuardService
     }
 
     /**
+     * The uids of the translations of a page and of everything below it. Translations of a page live next to
+     * it (same pid), so walking the pid tree finds the translations of the subpages as well.
+     *
      * @return list<int>
      */
-    protected function findTranslationUids(int $pageUid): array
+    protected function findTreeUids(int $pageUid): array
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+        $found = [];
+        $parents = [$pageUid];
+        for ($depth = 0; $depth < 50 && $parents !== [] && count($found) < 10000; $depth++) {
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+            $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+            $expr = $queryBuilder->expr();
+            $rows = $queryBuilder
+                ->select('uid')
+                ->from('pages')
+                ->where($expr->or(
+                    $expr->in('pid', $queryBuilder->createNamedParameter($parents, ArrayParameterType::INTEGER)),
+                    // translations of the pages of this level (the first level: of the page itself)
+                    $expr->in('l10n_parent', $queryBuilder->createNamedParameter($parents, ArrayParameterType::INTEGER))
+                ))
+                ->executeQuery()
+                ->fetchFirstColumn();
 
-        return array_map('intval', $queryBuilder
-            ->select('uid')
-            ->from('pages')
-            ->where($queryBuilder->expr()->eq('l10n_parent', $queryBuilder->createNamedParameter($pageUid, ParameterType::INTEGER)))
-            ->executeQuery()
-            ->fetchFirstColumn());
+            $next = [];
+            foreach ($rows as $uid) {
+                $uid = (int) $uid;
+                if ($uid !== $pageUid && !isset($found[$uid])) {
+                    $found[$uid] = true;
+                    $next[] = $uid;
+                }
+            }
+            $parents = $next;
+        }
+
+        return array_keys($found);
     }
 
     /**

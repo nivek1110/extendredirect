@@ -19,6 +19,16 @@ All notable changes to this project are documented here. The format follows
   the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
 
 ### Fixed
+- `request` check mode, multi-site and languages: after a followed redirect ends in a page, the target is rewritten to
+  the page link of the site and language that was actually requested. Before, the first page with that slug was taken -
+  on several sites with the same slug that could be the page of another site, or a translation instead of the default
+  language page.
+- Regex redirects in `request` mode: a target with a language prefix is resolved in that language, a hidden page is
+  broken, and a target on another host is left alone instead of being reported broken. A target with a capture group
+  still counts as healthy (it cannot be verified).
+- Page delete/hide protection: deleting or hiding a page now also covers redirects to its subpages and to the translations
+  of both; DataHandler fires the delete hook for the page only.
+- A faulty listener of `RedirectDisabledEvent` is logged and no longer breaks the save, the check or the page deletion.
 - Page delete/hide protection: a path target now only counts as pointing at the page if it is the page's URL - the
   slug behind the base path of the page's language, on a host of that site or language. Before, any target that merely
   ended with the slug was disabled: the same path on another site, a default language redirect when only its

@@ -296,4 +296,52 @@ class PageRedirectGuardMultiSiteTest extends FunctionalTestCase
         self::assertTrue($this->isDisabled($germanNoSlash));
         self::assertFalse($this->isDisabled($englishByPath));
     }
+
+    private function loginAdmin(): void
+    {
+        $users = $this->getConnectionPool()->getConnectionForTable('be_users');
+        $users->insert('be_users', ['pid' => 0, 'username' => 'admin' . uniqid(), 'password' => '', 'admin' => 1]);
+        $this->setUpBackendUser((int) $users->lastInsertId());
+    }
+
+    public function testDeletingAPageAlsoCoversRedirectsToItsSubpages(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/');
+        $parent = $this->insertPage($root, '/produkte');
+        $child = $this->insertPage($parent, '/produkte/schuhe');
+        $grandchild = $this->insertPage($child, '/produkte/schuhe/sneaker');
+        $toChild = $this->insertRedirect('t3://page?uid=' . $child);
+        $toGrandchildByPath = $this->insertRedirect('/produkte/schuhe/sneaker', 'example.com');
+        $elsewhere = $this->insertRedirect('/kontakt', 'example.com');
+
+        $this->loginAdmin();
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], ['pages' => [$parent => ['delete' => 1]]]);
+        $dataHandler->process_cmdmap();
+
+        self::assertTrue($this->isDisabled($toChild), 'the subpage is deleted with its parent');
+        self::assertTrue($this->isDisabled($toGrandchildByPath));
+        self::assertFalse($this->isDisabled($elsewhere));
+        self::assertGreaterThan(0, $grandchild);
+    }
+
+    public function testHidingAPageAlsoCoversRedirectsToItsSubpagesAndTheirTranslations(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/', '/de/');
+        $parent = $this->insertPage($root, '/produkte');
+        $child = $this->insertPage($parent, '/produkte/schuhe');
+        $childGerman = $this->insertPage($parent, '/produkte/schuhe-de', ['sys_language_uid' => 1, 'l10n_parent' => $child]);
+        $toChild = $this->insertRedirect('t3://page?uid=' . $child);
+        $toChildGerman = $this->insertRedirect('t3://page?uid=' . $childGerman);
+        $elsewhere = $this->insertRedirect('/kontakt', 'example.com');
+
+        $this->loginAdmin();
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start(['pages' => [$parent => ['hidden' => 1]]], []);
+        $dataHandler->process_datamap();
+
+        self::assertTrue($this->isDisabled($toChild));
+        self::assertTrue($this->isDisabled($toChildGerman));
+        self::assertFalse($this->isDisabled($elsewhere));
+    }
 }

@@ -571,34 +571,23 @@ class HealthCheckService
     {
         $target = (string) ($redirect['target'] ?? '');
 
-        try {
-            $linkDetails = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
-        } catch (\Exception) {
-            $linkDetails = [];
-        }
-
-        if (($linkDetails['type'] ?? null) === LinkService::TYPE_PAGE) {
-            $pageUid = $linkDetails['pageuid'] ?? null;
-            if (!is_numeric($pageUid) || !$this->pageExists((int) $pageUid)) {
-                return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
-            }
-
-            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
-        }
-
-        if (str_contains($target, '$')) {
+        if (!str_starts_with($target, 't3://') && str_contains($target, '$')) {
             // Dynamic capture-group target - nothing concrete to check against.
             return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
         }
 
-        $targetPath = (string) parse_url($target, PHP_URL_PATH);
-        $page = $this->getPageIdFromPath($targetPath);
-        if (!is_array($page)) {
+        // The same site- and language-aware lookup as in "database" mode, but no chain following: a regex source
+        // is a pattern, so there is no concrete URL to request.
+        $resolution = $this->resolveTargetPage($target, (string) ($redirect['source_host'] ?? '*'));
+        if ($resolution === self::TARGET_EXTERNAL || (is_array($resolution) && str_starts_with($target, 't3://'))) {
+            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
+        }
+        if (!is_array($resolution)) {
             return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
         }
 
         $message = '';
-        $correctedTarget = $this->toPageTypolink((int) $page['uid']);
+        $correctedTarget = $this->toPageTypolink($resolution['pageUid']);
         if ($correctedTarget && $correctedTarget !== $target) {
             $redirect['target'] = $correctedTarget;
             $message = $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.chainCorrected');
@@ -613,19 +602,6 @@ class HealthCheckService
     protected function toPageTypolink(int $pageUid): string
     {
         return (string) GeneralUtility::makeInstance(PageLinkHandler::class)->asString(['pageuid' => $pageUid]);
-    }
-
-    protected function pageExists(int $pageUid): bool
-    {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-        return (bool) $queryBuilder
-            ->count('uid')
-            ->from('pages')
-            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($pageUid, ParameterType::INTEGER)))
-            ->executeQuery()
-            ->fetchOne();
     }
 
     /**
@@ -1020,10 +996,10 @@ class HealthCheckService
                 // end up as a "t3://page?uid=..." link if it resolves to a page - not
                 // just when a multi-hop chain got flattened.
                 $message = '';
-                $urlPath = (string) parse_url($finalLocation, PHP_URL_PATH);
-                $page = $this->getPageIdFromPath($urlPath);
-                if (is_array($page) && array_key_exists('uid', $page)) {
-                    $correctedTarget = $this->toPageTypolink((int) $page['uid']);
+                // The page of the site (and language) that was requested - not just any page with that slug.
+                $resolution = $this->resolveTargetPage($finalLocation, (string) parse_url($url, PHP_URL_HOST));
+                if (is_array($resolution)) {
+                    $correctedTarget = $this->toPageTypolink($resolution['pageUid']);
                     if ($correctedTarget && $correctedTarget !== $redirect['target']) {
                         $redirect['target'] = $correctedTarget;
                         $message = $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.chainCorrected');
