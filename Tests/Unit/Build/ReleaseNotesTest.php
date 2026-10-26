@@ -53,13 +53,16 @@ class ReleaseNotesTest extends TestCase
     /**
      * @return array{0: int, 1: string, 2: string} exit code, stdout, stderr
      */
-    private function extract(string $version, ?string $file = null): array
+    private function extract(string $version, ?string $file = null, string ...$flags): array
     {
-        $process = proc_open(
-            ['bash', self::ROOT . '/Build/Scripts/release-notes.sh', $version, $file ?? $this->changelog],
-            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes
-        );
+        $command = ['bash', self::ROOT . '/Build/Scripts/release-notes.sh'];
+        foreach ($flags as $flag) {
+            $command[] = $flag;
+        }
+        $command[] = $version;
+        $command[] = $file ?? $this->changelog;
+
+        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         self::assertIsResource($process);
         $stdout = (string) stream_get_contents($pipes[1]);
         $stderr = (string) stream_get_contents($pipes[2]);
@@ -127,5 +130,45 @@ class ReleaseNotesTest extends TestCase
         [$code, $out] = $this->extract($version, self::ROOT . '/CHANGELOG.md');
         self::assertSame(0, $code, 'CHANGELOG.md needs a section for the current version');
         self::assertNotSame('', trim($out));
+    }
+
+    public function testPlainModeTurnsMarkdownIntoReadableText(): void
+    {
+        file_put_contents($this->changelog, <<<'MD'
+            ## [2.0.0] - 2026-12-01
+
+            First **bold** claim.
+
+            ### Added
+            - Option `notifyOnDisable` in the *notifications* category.
+              Second line of the bullet.
+
+            ### Upgrade notes
+            - Nothing to do.
+            MD);
+
+        [$code, $out] = $this->extract('2.0.0', null, '--plain');
+
+        self::assertSame(0, $code);
+        self::assertStringContainsString('First bold claim.', $out);
+        self::assertStringContainsString("Added:\n- Option notifyOnDisable in the notifications category.\n  Second line of the bullet.", $out);
+        self::assertStringContainsString("Upgrade notes:\n- Nothing to do.", $out);
+        self::assertDoesNotMatchRegularExpression('/[`#*]/', $out);
+    }
+
+    public function testPlainModeStillRefusesAnUnknownVersion(): void
+    {
+        [$code, $out] = $this->extract('9.9.9', null, '--plain');
+
+        self::assertNotSame(0, $code);
+        self::assertSame('', trim($out));
+    }
+
+    public function testDefaultModeKeepsTheMarkdown(): void
+    {
+        [, $out] = $this->extract('1.1.0');
+
+        self::assertStringContainsString('### Added', $out);
+        self::assertStringContainsString('`notifyOnDisable`', $out);
     }
 }

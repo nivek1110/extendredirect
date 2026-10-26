@@ -116,6 +116,20 @@ config is committed and travels with every worktree.
 4. The **Release** workflow then checks that the tag matches the version files and creates the GitHub release
    with the matching `CHANGELOG.md` section as its text. It does not wait for CI, so only tag a green commit.
    For a tag that already exists, run the workflow by hand from the Actions tab and enter the tag.
-5. Packagist picks the tag up by itself. Upload the TER zip manually (built from the tag, e.g. with
-   `tailor`) - the upload comment is plain text.
+5. Packagist picks the tag up by itself.
+6. **TER:** the same workflow uploads the version with [Tailor](https://github.com/TYPO3/tailor) - but only if the
+   repository secret `TYPO3_API_TOKEN` exists (without it the job just prints a notice). It is skipped if the version
+   is already in TER, packages exactly what the GitHub archive contains and uses the CHANGELOG section as plain-text
+   upload comment (`Build/Scripts/release-notes.sh --plain`). The upload cannot be undone, so tag only a green commit.
+
+### One-time setup for the automatic TER upload
+
+1. Register the extension key in TER (once) and install Tailor, e.g. in the DDEV container:
+   `composer global require typo3/tailor`.
+2. Create a token that may only publish this extension, e.g.
+   `tailor ter:token:create --name github-actions --extensions extendredirect --expires 31536000`
+   (needs your typo3.org login; the token expires after the given seconds, `tailor ter:token:refresh` renews it).
+3. On GitHub: *Settings → Secrets and variables → Actions → New repository secret*, name `TYPO3_API_TOKEN`, value
+   the token. Never commit it or paste it into a chat or an issue.
+4. After the token expires, create a new one and replace the secret.
 

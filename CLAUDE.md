@@ -102,6 +102,8 @@ Locked decisions:
 - Releases: tag `vX.Y.Z` on a green `main` commit; `.github/workflows/release.yml` creates the GitHub release from the
   CHANGELOG section (`Build/Scripts/release-notes.sh`) after checking the tag against `composer.json`/`ext_emconf.php`.
   `ReleaseNotesTest` fails if the CHANGELOG lacks a section for the current version or the version files disagree.
+  The same workflow has a `ter` job (Tailor `ter:publish`, comment = `release-notes.sh --plain`) that is a no-op until the
+  repo secret `TYPO3_API_TOKEN` exists and skips versions already in TER.
 - Disable log table `tx_extendredirect_disable_log` has a hidden, admin-only TCA; retention via `cleanuplog`.
 
 Supported floor is **PHP 8.3 / TYPO3 13.4**, test matrix PHP 8.3/8.4/8.5 and TYPO3 13.4 + 14.x. Keep

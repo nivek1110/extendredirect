@@ -1,6 +1,8 @@
 name: Release
 
-# Publishes a GitHub release for a version tag, with the matching CHANGELOG.md section as its text.
+# Publishes a GitHub release for a version tag, with the matching CHANGELOG.md section as its text,
+# and - if the repository secret TYPO3_API_TOKEN exists - uploads the version to the TYPO3 Extension
+# Repository (TER) with Tailor. Without the secret the TER job only prints a notice.
 # Tag only after CI is green on main - this workflow does not wait for the CI run.
 # For a tag that already exists (e.g. one pushed before this workflow was added), run it manually
 # from the Actions tab and enter the tag.
@@ -58,3 +60,65 @@ jobs:
           # v1.2.0-beta1 and the like are pre-releases
           if [[ "${TAG}" == *-* ]]; then args+=(--prerelease); fi
           gh release create "${TAG}" --repo "${GITHUB_REPOSITORY}" --verify-tag --title "${TAG}" --notes-file "${RUNNER_TEMP}/release-notes.md" "${args[@]}"
+
+  ter:
+    name: TER upload
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      TYPO3_API_TOKEN: ${{ secrets.TYPO3_API_TOKEN }}
+    steps:
+      - name: Check that a TER token is configured
+        id: token
+        run: |
+          if [ -z "${TYPO3_API_TOKEN}" ]; then
+            echo "::notice::No TYPO3_API_TOKEN secret configured - skipping the TER upload."
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.token.outputs.enabled == 'true'
+
+      - uses: actions/checkout@v7
+        if: steps.token.outputs.enabled == 'true'
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          path: tagged
+
+      - name: Check whether this version is already in TER
+        id: ter
+        if: steps.token.outputs.enabled == 'true'
+        run: |
+          version="${TAG#v}"
+          key="$(jq -r '.extra["typo3/cms"]["extension-key"]' tagged/composer.json)"
+          echo "key=${key}" >> "${GITHUB_OUTPUT}"
+          if curl -fsS "https://extensions.typo3.org/api/v1/extension/${key}/versions" | jq -e --arg v "${version}" '[.. | objects | select(.number? == $v)] | length > 0' > /dev/null; then
+            echo "::notice::Version ${version} of ${key} is already in TER - nothing to upload."
+            echo "upload=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "upload=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        if: steps.ter.outputs.upload == 'true'
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Publish to TER
+        if: steps.ter.outputs.upload == 'true'
+        run: |
+          version="${TAG#v}"
+          key="${{ steps.ter.outputs.key }}"
+          composer global require typo3/tailor --no-interaction --no-progress
+          tailor="$(composer global config bin-dir --absolute)/tailor"
+          # Package exactly what the GitHub archive contains (honours .gitattributes export-ignore).
+          mkdir export
+          git -C tagged archive HEAD | tar -x -C export
+          # The TER shows the upload comment as plain text.
+          comment="$(bash Build/Scripts/release-notes.sh --plain "${version}" tagged/CHANGELOG.md)"
+          "${tailor}" ter:publish "${version}" "${key}" --path export --comment "${comment}"
