@@ -34,7 +34,6 @@ class HealthCheckServiceTest extends TestCase
     private function invokeFindSitesBySourceHost(HealthCheckService $service, string $sourceHost): array
     {
         $method = new \ReflectionMethod($service, 'findSitesBySourceHost');
-        $method->setAccessible(true);
 
         return $method->invoke($service, $sourceHost);
     }
@@ -42,7 +41,6 @@ class HealthCheckServiceTest extends TestCase
     private function invokeResolveAbsoluteLocation(HealthCheckService $service, string $location): string
     {
         $method = new \ReflectionMethod($service, 'resolveAbsoluteLocation');
-        $method->setAccessible(true);
 
         return $method->invoke($service, $location);
     }

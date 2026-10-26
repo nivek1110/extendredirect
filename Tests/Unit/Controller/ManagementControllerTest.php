@@ -55,7 +55,6 @@ class ManagementControllerTest extends TestCase
         $controller = $this->createController();
 
         $method = new \ReflectionMethod($controller, 'redirectsModuleRouteIdentifier');
-        $method->setAccessible(true);
         $result = $method->invoke($controller);
 
         $expected = (new Typo3Version())->getMajorVersion() >= 14 ? 'redirects' : 'site_redirects';
