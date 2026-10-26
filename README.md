@@ -52,6 +52,9 @@ up unnoticed.
 - **Disable log cleanup** — `extendredirect:cleanuplog --days=30` deletes disable log entries older
   than the given number of days (default 30). Schedulable like the core "Table garbage collection"
   task; the `days` option becomes a field in the Scheduler task form.
+- **Optional email notification** — when a redirect is disabled (by the health check or the page
+  protection) a mail can be sent to a list of recipients, either as one summary mail per run or as one
+  mail per redirect. Off by default, see [Configuration](#configuration).
 - **No duplicate/confusing notifications** — the generic "Record saved" toast is suppressed on
   `sys_redirect` saves so it doesn't contradict the health-check's own outcome message (e.g.
   "Redirect disabled").
@@ -77,6 +80,19 @@ Extension configuration (Admin Tools → Settings → Extension Configuration �
 | Setting     | Type    | Description                                                                                                     |
 |-------------|---------|-------------------------------------------------------------------------------------------------------------------|
 | `checkMode` | options | `request` (default): follow the redirect live over HTTP, like a browser. `database`: resolve directly against the `pages`/`sys_redirect` tables without firing any request. |
+
+Notification settings (same place, category *notifications*):
+
+| Setting            | Type    | Description |
+|--------------------|---------|-------------|
+| `notifyOnDisable`  | boolean | Send an email when a redirect is disabled. Default: off. |
+| `notifyRecipients` | string  | Comma or semicolon separated addresses. Invalid ones are ignored; without a valid address nothing is sent. The sender is TYPO3's default mail sender (`$GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress']`). |
+| `notifyMode`       | options | `digest` (default): one mail listing every redirect disabled during one check, command run or page change. `single`: one mail per redirect, sent immediately. |
+| `notifyLanguage`   | options | `en` (default) or `de`. |
+
+Nothing is sent by `--dry-run`, and a failing mail transport is only logged — it never breaks a save,
+a check or a page deletion. The Scheduler task or CLI run needs a working mail configuration (`MAIL`) like
+any other TYPO3 mail.
 
 > **`request` mode needs a working site base URL.** The check builds the URL to follow from each
 > site's configured base (Site Configuration → Base). Without a reachable, correctly configured base

@@ -73,6 +73,11 @@ Entry points -> services -> repositories:
   through an in-process frontend sub-request (`redirectFollower()`), `database` resolves purely against
   `pages`/`sys_redirect` (follows chains up to `MAX_CHAIN_HOPS`, flattens them, rewrites targets to
   `t3://page?uid=`). `runBulkCheck()` is the bulk entry (dry-run, delay, max-runtime, limit).
+- `Service/DisableNotificationService` (a singleton) queues each disabled redirect from `logDisable()` /
+  `PageRedirectGuardService` and mails them on `flush()` (end of a bulk run / page guard / single check; immediately
+  in `single` mode). Off unless `notifyOnDisable`; mail failures are logged, never thrown. Template:
+  `Resources/Private/Templates/Email/RedirectsDisabled.{html,txt}` (plain `.html`/`.txt` names work on 13.4 and 14.x);
+  the text template wraps translations in `f:format.raw` so labels with quotes are not HTML-escaped.
 - `Command/CheckCommand` (`extendredirect:checkredirects`) and `Command/CleanupLogCommand`
   (`extendredirect:cleanuplog`) - both schedulable, registered with description in `Configuration/Services.yaml`.
 - `Controller/ManagementController` + `Resources/Private/Templates/Management/` extend the core Redirects module

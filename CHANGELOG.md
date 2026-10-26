@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Optional email notification when a redirect is disabled (health check and page delete/hide protection):
+  `notifyOnDisable` (off by default), `notifyRecipients`, `notifyMode` (`digest` = one summary mail per run,
+  `single` = one mail per redirect) and `notifyLanguage` (`en`/`de`). No mail on `--dry-run`; a failing mail
+  transport is logged and never breaks the save or check.
+
 ## [1.0.0] - 2026-10-23
 
 First release. Makes TYPO3's Redirects module self-maintaining.
