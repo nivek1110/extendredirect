@@ -344,4 +344,28 @@ class PageRedirectGuardMultiSiteTest extends FunctionalTestCase
         self::assertTrue($this->isDisabled($toChildGerman));
         self::assertFalse($this->isDisabled($elsewhere));
     }
+
+    public function testARegexRedirectWithAConcreteTargetIsDisabledAndOneWithACaptureGroupIsNotMatched(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/');
+        $page = $this->insertPage($root, '/neu');
+        $connection = $this->getConnectionPool()->getConnectionForTable('sys_redirect');
+        $insert = function (string $target) use ($connection): int {
+            $connection->insert('sys_redirect', [
+                'pid' => 0, 'source_host' => '*', 'source_path' => '#^/old/(.*)$#', 'target' => $target,
+                'target_statuscode' => 301, 'disabled' => 0, 'is_regexp' => 1,
+            ]);
+
+            return (int) $connection->lastInsertId();
+        };
+        $concreteLink = $insert('t3://page?uid=' . $page);
+        $concretePath = $insert('/neu');
+        $dynamic = $insert('/neu/$1');
+
+        $this->subject->disableRedirectsTargetingPage($page, 'healthCheck.targetPageDeleted');
+
+        self::assertTrue($this->isDisabled($concreteLink));
+        self::assertTrue($this->isDisabled($concretePath));
+        self::assertFalse($this->isDisabled($dynamic), 'a capture group target is never matched');
+    }
 }

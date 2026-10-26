@@ -89,10 +89,13 @@ so an enabled redirect works on the live site right away and a disabled one stop
 
 ### Regex redirects
 
-A regex source (`is_regexp`) has no concrete URL, so there is nothing to request: only the **target** is checked,
-and only if it is concrete - a page link or a path that must resolve to a visible page in its site and language, or a
-target on another host, which is left alone. A target with a capture group (`/new/$1`) cannot be verified and counts as
-healthy; the pattern itself is not tested either.
+A redirect with **Is regular expression** ticked is **not checked at all**: its source is a pattern, so there is no URL
+to request, and with capture groups (`/new/$1`) nothing says whether the target is right. It is never disabled by a
+check and its target is never rewritten. A regex redirect that an earlier version of the extension had disabled is
+enabled again by the next check; one you disabled by hand stays disabled.
+
+The page delete/hide protection still applies: it disables a regex redirect whose target is a concrete page link or
+path of the deleted or hidden page, because that is certain. A target with a capture group is never matched.
 
 ### Several sites and languages
 

@@ -666,6 +666,22 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame(1, (int) $this->redirect($first)['disabled']);
     }
 
+    public function testARegexRedirectIsNeverCheckedInDatabaseModeEither(): void
+    {
+        $broken = $this->insertRedirect('#^/a$#', '/does-not-exist', ['is_regexp' => 1]);
+        $dynamic = $this->insertRedirect('#^/c/(.*)$#', '/gone/$1', ['is_regexp' => 1]);
+        $earlier = $this->insertRedirect('#^/d$#', '/does-not-exist', ['is_regexp' => 1, 'disabled' => 1, 'broken_redirect' => 1]);
+        $byHand = $this->insertRedirect('#^/e$#', '/new', ['is_regexp' => 1, 'disabled' => 1]);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($broken)['disabled']);
+        self::assertSame(0, (int) $this->redirect($dynamic)['disabled']);
+        self::assertSame(0, (int) $this->redirect($earlier)['disabled'], 'disabled by an earlier version: enabled again');
+        self::assertSame(1, (int) $this->redirect($byHand)['disabled']);
+        self::assertSame(0, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
+    }
+
     /**
      * @param list<array{uid: int, source: string, message: string, newlyDisabled: bool}> $broken
      * @return list<array{uid: int, newlyDisabled: bool}>

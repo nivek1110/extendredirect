@@ -351,6 +351,13 @@ class HealthCheckService
      */
     protected function checkRedirect(array &$redirect): array
     {
+        // A regex redirect is not checked at all: its source is a pattern, there is no URL to request, and with capture
+        // groups ($1) nothing says whether the target is right. It is never disabled, nor is its target rewritten; one an
+        // earlier version disabled counts as healthy and is enabled again.
+        if ((bool) ($redirect['is_regexp'] ?? false)) {
+            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
+        }
+
         $existRedirect = GeneralUtility::makeInstance(RedirectRepository::class)
             ->findDuplicatesBySourcePath((string) $redirect['source_path'], (string) $redirect['source_host']);
         if (count($existRedirect) > 1) {
@@ -361,13 +368,6 @@ class HealthCheckService
         // see checkRedirectViaDatabase().
         if ($this->getCheckMode() === 'database') {
             return $this->checkRedirectViaDatabase($redirect);
-        }
-
-        // A regex source_path is a pattern, not a literal path - it can't be requested
-        // over HTTP like a normal source. Instead of following the (non-existent) URL,
-        // just verify the target still exists.
-        if ((bool) ($redirect['is_regexp'] ?? false)) {
-            return $this->checkRegexRedirectTarget($redirect);
         }
 
         // The core ignores a disabled redirect, so its source URL 404s no matter how healthy the target is -
@@ -557,48 +557,6 @@ class HealthCheckService
         }
 
         return current($results);
-    }
-
-    /**
-     * Checks whether a regex redirect's target still exists, without touching the
-     * (non-literal) source_path. A "t3://page?uid=X" target must reference an
-     * existing, non-deleted page. A plain path/URL target is checked against
-     * page slugs - and, same as a plain redirect's checkSingleUrl(), rewritten
-     * into that canonical "t3://page?uid=..." form once resolved - unless it
-     * contains capture-group placeholders ($1, $2, ...), which can't be resolved
-     * to a single concrete target and are left alone.
-     *
-     * @param array<mixed> &$redirect
-     *
-     * @return array<mixed>
-     */
-    protected function checkRegexRedirectTarget(array &$redirect): array
-    {
-        $target = (string) ($redirect['target'] ?? '');
-
-        if (!str_starts_with($target, 't3://') && str_contains($target, '$')) {
-            // Dynamic capture-group target - nothing concrete to check against.
-            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
-        }
-
-        // The same site- and language-aware lookup as in "database" mode, but no chain following: a regex source
-        // is a pattern, so there is no concrete URL to request.
-        $resolution = $this->resolveTargetPage($target, (string) ($redirect['source_host'] ?? '*'));
-        if ($resolution === self::TARGET_EXTERNAL || (is_array($resolution) && str_starts_with($target, 't3://'))) {
-            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
-        }
-        if (!is_array($resolution)) {
-            return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
-        }
-
-        $message = '';
-        $correctedTarget = $this->toPageTypolink($resolution['pageUid']);
-        if ($correctedTarget && $correctedTarget !== $target) {
-            $redirect['target'] = $correctedTarget;
-            $message = $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.chainCorrected');
-        }
-
-        return ['redirectError' => false, 'redirectCount' => 0, 'message' => $message];
     }
 
     /**

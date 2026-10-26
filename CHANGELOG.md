@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Regex redirects (**Is regular expression** ticked) are no longer checked at all, in `request` and `database` mode:
+  their source is a pattern and nothing says whether a target with a capture group (`/new/$1`) is right, so they are
+  never disabled by a check and their target is never rewritten. One that an earlier version disabled is enabled again
+  by the next check. The page delete/hide protection still disables a regex redirect whose target is a concrete page
+  link or path of the deleted page. Before, a regex redirect was disabled when its concrete target did not resolve.
+
 ### Fixed
 - Languages with a fallback chain: a page counts as available in a language if it is translated into it or one of the
   languages of its fallback chain (`fallbacks`) has it - the default language always does. This follows TYPO3, which
