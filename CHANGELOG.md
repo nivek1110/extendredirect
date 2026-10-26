@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- `extendredirect:checkredirects` reports a redirect that an earlier check already disabled and that is still
+  broken as "Still broken" instead of "Disabled", and the summary states how many redirects were newly disabled
+  (or would be, with `--dry-run`).
+
 ## [1.1.0] - 2026-10-26
 
 ### Added

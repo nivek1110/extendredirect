@@ -52,7 +52,7 @@ class CheckCommandTest extends TestCase
         $healthCheckService = $this->createStub(HealthCheckService::class);
         $healthCheckService->method('runBulkCheck')->willReturn($this->bulkResult([
             'checked' => 1,
-            'broken' => [['uid' => 7, 'source' => 'example.com/old', 'message' => 'The page was not found!']],
+            'broken' => [['uid' => 7, 'source' => 'example.com/old', 'message' => 'The page was not found!', 'newlyDisabled' => true]],
         ]));
 
         $tester = new CommandTester(new CheckCommand($healthCheckService));
@@ -83,5 +83,46 @@ class CheckCommandTest extends TestCase
         self::assertSame(1, $tester->execute(['--delay' => '-1']));
         self::assertSame(1, $tester->execute(['--max-runtime' => 'abc']));
         self::assertSame(1, $tester->execute(['--limit' => '-5']));
+    }
+
+    public function testRedirectsThatWereAlreadyDisabledAreReportedAsStillBroken(): void
+    {
+        $healthCheckService = $this->createStub(HealthCheckService::class);
+        $healthCheckService->method('runBulkCheck')->willReturn($this->bulkResult([
+            'checked' => 2,
+            'broken' => [
+                ['uid' => 7, 'source' => 'example.com/new-case', 'message' => 'Page not found', 'newlyDisabled' => true],
+                ['uid' => 8, 'source' => 'example.com/known-case', 'message' => 'Page not found', 'newlyDisabled' => false],
+            ],
+        ]));
+
+        $tester = new CommandTester(new CheckCommand($healthCheckService));
+        $tester->execute([]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Disabled redirect #7 (example.com/new-case)', $display);
+        self::assertStringContainsString('Still broken: redirect #8 (example.com/known-case)', $display);
+        self::assertStringNotContainsString('Disabled redirect #8', $display);
+        self::assertStringContainsString('2 broken (1 newly disabled)', $display);
+    }
+
+    public function testDryRunSeparatesWouldDisableFromStillBroken(): void
+    {
+        $healthCheckService = $this->createStub(HealthCheckService::class);
+        $healthCheckService->method('runBulkCheck')->willReturn($this->bulkResult([
+            'checked' => 2,
+            'broken' => [
+                ['uid' => 7, 'source' => 'example.com/new-case', 'message' => 'Page not found', 'newlyDisabled' => true],
+                ['uid' => 8, 'source' => 'example.com/known-case', 'message' => 'Page not found', 'newlyDisabled' => false],
+            ],
+        ]));
+
+        $tester = new CommandTester(new CheckCommand($healthCheckService));
+        $tester->execute(['--dry-run' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Would disable redirect #7', $display);
+        self::assertStringContainsString('Still broken: redirect #8', $display);
+        self::assertStringContainsString('2 broken (1 would be newly disabled)', $display);
     }
 }

@@ -299,4 +299,33 @@ class HealthCheckServiceTest extends FunctionalTestCase
 
         self::assertSame(0, (int) $this->redirect($uid)['last_checked']);
     }
+
+    public function testBulkCheckFlagsOnlyFirstTimeDisablingsAsNewlyDisabled(): void
+    {
+        $uid = $this->insertRedirect('/old', '/does-not-exist');
+
+        $first = $this->subject->runBulkCheck();
+        $second = $this->subject->runBulkCheck();
+
+        self::assertSame([['uid' => $uid, 'newlyDisabled' => true]], $this->uidsAndFlag($first['broken']));
+        self::assertSame([['uid' => $uid, 'newlyDisabled' => false]], $this->uidsAndFlag($second['broken']), 'still broken, but already disabled before this run');
+    }
+
+    public function testDryRunFlagsAnEnabledBrokenRedirectAsWouldBeNewlyDisabled(): void
+    {
+        $uid = $this->insertRedirect('/old', '/does-not-exist');
+
+        $result = $this->subject->runBulkCheck(true);
+
+        self::assertSame([['uid' => $uid, 'newlyDisabled' => true]], $this->uidsAndFlag($result['broken']));
+    }
+
+    /**
+     * @param list<array{uid: int, source: string, message: string, newlyDisabled: bool}> $broken
+     * @return list<array{uid: int, newlyDisabled: bool}>
+     */
+    private function uidsAndFlag(array $broken): array
+    {
+        return array_map(static fn(array $b): array => ['uid' => $b['uid'], 'newlyDisabled' => $b['newlyDisabled']], $broken);
+    }
 }

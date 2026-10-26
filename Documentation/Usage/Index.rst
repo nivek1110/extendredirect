@@ -35,6 +35,9 @@ Checks all redirects and disables broken ones.
 `--limit=<n>`
     Check at most n redirects per run. Default `0` (all).
 
+The output lists every broken redirect: "Disabled redirect" (or "Would disable" with `--dry-run`) for the ones
+disabled in this run and "Still broken" for the ones an earlier check had already disabled.
+
 Redirects are processed never-checked first, then least recently checked, so limited runs rotate
 through all redirects. Redirects disabled by hand are skipped and never re-enabled.
 

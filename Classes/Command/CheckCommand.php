@@ -67,19 +67,33 @@ class CheckCommand extends Command
         if ($dryRun) {
             $this->io->note('Dry run: nothing was changed.');
         }
+        $newlyDisabled = 0;
         foreach ($result['broken'] as $broken) {
-            $this->io->writeln(sprintf(
-                '%s redirect #%d (%s): %s',
-                $dryRun ? 'Would disable' : 'Disabled',
-                $broken['uid'],
-                $broken['source'],
-                $broken['message']
-            ));
+            if ($broken['newlyDisabled']) {
+                $newlyDisabled++;
+                $this->io->writeln(sprintf(
+                    '%s redirect #%d (%s): %s',
+                    $dryRun ? 'Would disable' : 'Disabled',
+                    $broken['uid'],
+                    $broken['source'],
+                    $broken['message']
+                ));
+            } else {
+                // Already disabled by an earlier check - nothing changed in this run.
+                $this->io->writeln(sprintf(
+                    'Still broken: redirect #%d (%s): %s',
+                    $broken['uid'],
+                    $broken['source'],
+                    $broken['message']
+                ));
+            }
         }
         $this->io->success(sprintf(
-            'Checked %d redirects, %d broken, %d skipped (disabled by hand).',
+            'Checked %d redirects, %d broken (%d %s), %d skipped (disabled by hand).',
             $result['checked'],
             count($result['broken']),
+            $newlyDisabled,
+            $dryRun ? 'would be newly disabled' : 'newly disabled',
             $result['skipped']
         ));
         if ($result['remaining'] > 0) {

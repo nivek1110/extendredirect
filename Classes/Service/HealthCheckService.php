@@ -87,7 +87,7 @@ class HealthCheckService
      * @param int  $maxRuntime stop starting new checks after this many seconds (0 = no limit)
      * @param int  $limit      check at most this many redirects, least recently checked first (0 = no limit)
      *
-     * @return array{checked: int, skipped: int, remaining: int, broken: list<array{uid: int, source: string, message: string}>}
+     * @return array{checked: int, skipped: int, remaining: int, broken: list<array{uid: int, source: string, message: string, newlyDisabled: bool}>}
      * @throws Exception
      */
     public function runBulkCheck(bool $dryRun = false, int $delayMs = 0, int $maxRuntime = 0, int $limit = 0): array
@@ -111,6 +111,8 @@ class HealthCheckService
                 break;
             }
 
+            // checkRedirect() may rewrite the target, but never touches "disabled".
+            $wasEnabled = (int) $redirect['disabled'] === 0;
             $check = $this->checkRedirect($redirect);
             $result['checked']++;
 
@@ -119,6 +121,9 @@ class HealthCheckService
                     'uid' => (int) $redirect['uid'],
                     'source' => (string) $redirect['source_host'] . (string) $redirect['source_path'],
                     'message' => (string) $check['message'],
+                    // false: still broken, but it was already disabled before this run
+                    // (in a dry run: true = it would be disabled now)
+                    'newlyDisabled' => $wasEnabled,
                 ];
             }
 
