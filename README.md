@@ -23,9 +23,15 @@ up unnoticed.
   browser would, or resolved purely against the `pages`/`sys_redirect` tables without firing a single
   request (your choice, see [Configuration](#configuration)). Redirects whose target no longer
   resolves are disabled automatically.
-- **Self-healing targets** — a target that resolves to a TYPO3 page is rewritten to the canonical
+- **Automatic re-enabling ("healing")** — a redirect the extension disabled itself is checked again
+  on every later check. As soon as its target works again (the page is back, the target was
+  corrected), the redirect is switched back on and redirects visitors again, without anyone having
+  to touch it. Redirects you disabled by hand are never switched back on. See
+  [Lifecycle of a redirect](#lifecycle-of-a-redirect).
+- **Canonical targets** — a target that resolves to a TYPO3 page is rewritten to the canonical
   `t3://page?uid=…` link, and a chain of several redirects hopping to each other (up to 10 hops) is
-  flattened straight to the final page, so it isn't repeatedly re-checked.
+  flattened straight to the final page, so it isn't repeatedly re-checked. This only tidies up
+  working redirects; it has nothing to do with re-enabling broken ones.
 - **Re-checked on every edit** — the moment you change a redirect's target, it's automatically
   re-enabled and health-checked again, so a fix is confirmed working immediately instead of waiting
   for the next scheduled run.
@@ -66,6 +72,20 @@ up unnoticed.
 - **No duplicate/confusing notifications** — the generic "Record saved" toast is suppressed on
   `sys_redirect` saves so it doesn't contradict the health-check's own outcome message (e.g.
   "Redirect disabled").
+
+### Lifecycle of a redirect
+
+A redirect is in one of three states:
+
+| State | What it means | Who sets it | How it becomes active again |
+|-------|---------------|-------------|-----------------------------|
+| **Active** | The target works and visitors are redirected. | — | — |
+| **Disabled automatically** | The check found the target broken (page deleted or hidden, target gone, chain too long, duplicate source). The redirect is marked as a *broken redirect*, an entry is written to the disable log and, if enabled, a notification goes out. | The extension | **Automatically** (healing): the next check — bulk run, command or Scheduler — finds the target working and enables it again. An editor who changes the target in the record gets the same immediately: it is enabled and checked on save. |
+| **Disabled by hand** | An editor ticked "disabled" in the redirect record. | The editor | Only by an editor. The extension never switches it back on and skips it in bulk runs. |
+
+The disable log is a history: an entry stays when its redirect is healed, and a redirect that breaks
+again gets a new entry. When a check changes a redirect's state, the core's redirect index is rebuilt,
+so an enabled redirect works on the live site right away and a disabled one stops redirecting.
 
 ## Installation
 

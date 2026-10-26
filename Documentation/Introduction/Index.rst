@@ -15,8 +15,11 @@ Features
 *   **Health check** - every redirect target is verified, either by following it through a
     frontend sub-request (`request` mode) or purely against the `pages`/`sys_redirect` tables
     (`database` mode). Redirects whose target no longer resolves are disabled.
-*   **Self-healing targets** - page targets are rewritten to `t3://page?uid=...`; chains of up
-    to 10 redirects are flattened to the final page.
+*   **Automatic re-enabling ("healing")** - a redirect the extension disabled itself is enabled again by
+    the next check that finds its target working; redirects disabled by hand are never touched, see
+    :ref:`usage-lifecycle`.
+*   **Canonical targets** - page targets are rewritten to `t3://page?uid=...`; chains of up
+    to 10 redirects are flattened to the final page. This only tidies up working redirects.
 *   **Re-check on edit** - changing a target re-enables and re-checks the redirect.
 *   **Page delete/hide protection** - redirects pointing to a deleted or hidden page are disabled
     with a logged reason.

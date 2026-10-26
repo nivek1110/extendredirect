@@ -9,6 +9,26 @@ Usage
 The Redirects module (:guilabel:`Link Management > Redirects`) gains the broken-redirect
 filter, a "last checked" column and filter, the CSV import and export and the disable log.
 
+..  _usage-lifecycle:
+
+Lifecycle of a redirect
+=======================
+
+A redirect is in one of three states:
+
+*   **Active**: the target works and visitors are redirected.
+*   **Disabled automatically**: the check found the target broken (page deleted or hidden, target gone, chain
+    too long, duplicate source). The redirect is marked as a *broken redirect*, an entry is written to the
+    disable log and, if enabled, a notification goes out. It is enabled again **automatically** ("healing") by
+    the next check that finds the target working - a bulk run, the command or the Scheduler. An editor who
+    changes the target in the record gets the same immediately: the redirect is enabled and checked on save.
+*   **Disabled by hand**: an editor ticked :guilabel:`Disabled` in the redirect record. The extension never
+    switches it back on and skips it in bulk runs; only an editor can enable it again.
+
+The disable log is a history: an entry stays when its redirect is healed, and a redirect that breaks again gets
+a new entry. When a check changes the state of a redirect, the core's redirect index is rebuilt, so an enabled
+redirect works on the live site right away and a disabled one stops redirecting.
+
 CSV export
 ==========
 
