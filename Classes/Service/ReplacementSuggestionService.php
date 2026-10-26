@@ -179,6 +179,7 @@ class ReplacementSuggestionService
     private function resolveLanguage(Site $site, ?SiteLanguage $hostLanguage, string $target): array
     {
         if ($hostLanguage !== null) {
+            // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
             return [$hostLanguage->getLanguageId(), $target];
         }
 
@@ -190,10 +191,12 @@ class ReplacementSuggestionService
             }
             $prefix = '/' . trim(substr(rtrim($language->getBase()->getPath(), '/'), strlen($sitePath)), '/');
             if ($prefix !== '/' && ($path === $prefix || str_starts_with($path, $prefix . '/'))) {
+                // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
                 return [$language->getLanguageId(), substr($path, strlen($prefix)) ?: '/'];
             }
         }
 
+        // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
         return [$site->getDefaultLanguage()->getLanguageId(), $target];
     }
 
