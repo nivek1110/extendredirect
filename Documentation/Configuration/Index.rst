@@ -23,6 +23,8 @@ Extension configuration
         `request` mode needs a reachable, correctly configured site base URL
         (Site Configuration > Base). Use `database` mode for local or offline environments.
 
+..  _configuration-notification:
+
 Email notification
 ==================
 

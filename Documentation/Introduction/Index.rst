@@ -23,5 +23,7 @@ Features
 *   **Broken-redirect filter** in the Redirects module.
 *   **Disable log** - reason, source, target and timestamp of every automatic disabling.
 *   **CSV import** - semicolon-separated, with validation of hosts and duplicate source paths.
+*   **Email notification** (optional) - a mail when a redirect is disabled, as one summary mail per
+    run or one mail per redirect; off by default, see :ref:`configuration-notification`.
 *   **Commands** - `extendredirect:checkredirects` and `extendredirect:cleanuplog`, both
     schedulable.
