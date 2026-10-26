@@ -6,6 +6,7 @@ services:
 
   Nivek1110\Extendredirect\:
     resource: '../Classes/*'
+    exclude: '../Classes/Event/*'
 
   Nivek1110\Extendredirect\Controller\ManagementController:
     tags: [ 'backend.controller' ]

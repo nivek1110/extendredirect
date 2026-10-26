@@ -37,7 +37,7 @@ protection - a mail can be sent. It is off by default and uses TYPO3's mail conf
     :type: boolean
     :Default: 0
 
-    Send an email when a redirect is disabled.
+    Notify when a redirect is disabled. Switches the mail and the webhook (see below).
 
 ..  confval:: notifyRecipients
     :name: confval-notifyrecipients
@@ -60,6 +60,51 @@ protection - a mail can be sent. It is off by default and uses TYPO3's mail conf
     :Default: en
 
     Language of the mail: `en` or `de`.
+
+Webhook
+=======
+
+Instead of or in addition to the mail, the same notification can be posted as JSON to a webhook. It
+needs :confval:`notifyOnDisable` and follows :confval:`notifyMode` (one call per run or per redirect).
+
+..  confval:: notifyWebhookUrl
+    :name: confval-notifywebhookurl
+    :type: string
+
+    http(s) URL that receives the JSON `POST`. Empty = no webhook. Calls time out after 5 seconds.
+    Only administrators can set it, and it is not validated beyond the scheme: do not point it at
+    internal services you do not control.
+
+..  confval:: notifyWebhookFormat
+    :name: confval-notifywebhookformat
+    :type: options
+    :Default: text
+
+    `text`: `{"text": "..."}`, understood by Slack, Mattermost and Rocket.Chat incoming webhooks.
+    `json`: a structured payload with `event` (`redirects_disabled`), `site`, `count` and a list
+    `redirects` of `redirect_uid`, `source_host`, `source_path`, `target`, `status_code`, `reason`.
+
+PSR-14 event
+============
+
+Independent of all notification settings, the :php:`Nivek1110\Extendredirect\Event\RedirectDisabledEvent`
+is dispatched for every redirect that was disabled and logged (by the health check or the page
+delete/hide protection). The redirect is already disabled when listeners run.
+
+..  code-block:: php
+
+    use Nivek1110\Extendredirect\Event\RedirectDisabledEvent;
+    use TYPO3\CMS\Core\Attribute\AsEventListener;
+
+    #[AsEventListener]
+    final class MyListener
+    {
+        public function __invoke(RedirectDisabledEvent $event): void
+        {
+            // getRedirectUid(), getSourceHost(), getSourcePath(), getTarget(),
+            // getStatusCode(), getReason(), getEntry()
+        }
+    }
 
 ..  note::
     Nothing is sent by `--dry-run`. A failing mail transport is only logged and never breaks a save, a

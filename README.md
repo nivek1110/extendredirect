@@ -35,11 +35,17 @@ up unnoticed.
   you can list exactly the redirects that need attention.
 - **Disable log** — a dedicated log view lists every redirect the health check (or the page-guard)
   has disabled, with the reason, source, target and timestamp — so nothing gets disabled silently.
-  Entries can be deleted individually or all at once.
+  Entries can be deleted individually or all at once. A "Check now" button per entry re-checks that
+  redirect on demand: a healthy one is enabled again, a broken one stays disabled (redirects you
+  disabled by hand are never touched).
+- **Last checked** — the overview shows when each redirect was last checked and can filter for
+  never-checked redirects or ones not checked for 1, 7 or 30 days, so you can see whether the
+  Scheduler actually runs.
 - **CSV import** — bulk-import redirects from a semicolon-separated CSV file straight from the
   module's toolbar, with built-in validation: unknown source hosts and duplicate source paths are
   rejected/skipped and reported back, and page-resolving targets are converted to canonical page
-  links on the way in.
+  links on the way in. An "Export redirects" button downloads all redirects as CSV in the same
+  format, so an export can be edited and imported again.
 - **CLI / Scheduler command** — `extendredirect:checkredirects` runs the health check over every
   redirect in bulk, so you can schedule it via TYPO3's Scheduler or cron instead of relying purely on
   the on-edit check.
@@ -55,6 +61,10 @@ up unnoticed.
 - **Optional email notification** — when a redirect is disabled (by the health check or the page
   protection) a mail can be sent to a list of recipients, either as one summary mail per run or as one
   mail per redirect. Off by default, see [Configuration](#configuration).
+- **Webhook and PSR-14 event** — the same notification can be posted as JSON to a webhook (a chat
+  message for Slack/Mattermost/Rocket.Chat, or structured JSON for your own endpoint). Independent of
+  that, every disabled redirect is dispatched as `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`,
+  so your own code can react to it.
 - **No duplicate/confusing notifications** — the generic "Record saved" toast is suppressed on
   `sys_redirect` saves so it doesn't contradict the health-check's own outcome message (e.g.
   "Redirect disabled").
@@ -85,10 +95,32 @@ Notification settings (same place, category *notifications*):
 
 | Setting            | Type    | Description |
 |--------------------|---------|-------------|
-| `notifyOnDisable`  | boolean | Send an email when a redirect is disabled. Default: off. |
+| `notifyOnDisable`  | boolean | Notify when a redirect is disabled (switches mail and webhook). Default: off. |
 | `notifyRecipients` | string  | Comma or semicolon separated addresses. Invalid ones are ignored; without a valid address nothing is sent. The sender is TYPO3's default mail sender (`$GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress']`). |
 | `notifyMode`       | options | `digest` (default): one mail listing every redirect disabled during one check, command run or page change. `single`: one mail per redirect, sent immediately. |
 | `notifyLanguage`   | options | `en` (default) or `de`. |
+| `notifyWebhookUrl` | string  | Optional http(s) URL that receives a JSON `POST` with the same rhythm as the mail. Empty = no webhook. Calls time out after 5 seconds; failures are logged, never fatal. |
+| `notifyWebhookFormat` | options | `text` (default): `{"text": "..."}` as understood by Slack, Mattermost and Rocket.Chat incoming webhooks. `json`: `{"event": "redirects_disabled", "site": "...", "count": 1, "redirects": [{"redirect_uid", "source_host", "source_path", "target", "status_code", "reason"}]}`. |
+
+The webhook URL is configured by administrators only; it is not validated beyond being http(s), so do not
+point it at internal services you do not control.
+
+To react in your own code, listen to the event (it is dispatched for every disabled redirect,
+regardless of these settings):
+
+```php
+use Nivek1110\Extendredirect\Event\RedirectDisabledEvent;
+use TYPO3\CMS\Core\Attribute\AsEventListener;
+
+#[AsEventListener]
+final class MyListener
+{
+    public function __invoke(RedirectDisabledEvent $event): void
+    {
+        // $event->getRedirectUid(), getSourceHost(), getSourcePath(), getTarget(), getReason() ...
+    }
+}
+```
 
 Nothing is sent by `--dry-run`, and a failing mail transport is only logged — it never breaks a save,
 a check or a page deletion. The Scheduler task or CLI run needs a working mail configuration (`MAIL`) like

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nivek1110\Extendredirect\Service;
 
+use Nivek1110\Extendredirect\Event\RedirectDisabledEvent;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Address;
@@ -11,19 +13,22 @@ use Symfony\Component\Mime\Email;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Mail\FluidEmail;
+use TYPO3\CMS\Core\Http\RequestFactory;
 use TYPO3\CMS\Core\Mail\MailerInterface;
 use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
- * Optionally tells the configured recipients that redirects were disabled.
+ * Announces disabled redirects: always as PSR-14 RedirectDisabledEvent, and - if enabled - by mail
+ * and/or to a webhook.
  *
  * Disabled redirects are handed in via queue() as they are logged. Depending on the
  * "notifyMode" extension setting a mail goes out immediately for every redirect ("single")
  * or one summary mail with everything queued is sent on flush() ("digest", the default) - so
  * a bulk run that disables 200 redirects results in one mail, not 200. Sending is off unless
- * "notifyOnDisable" is enabled, and a failing mail transport is logged but never breaks the
- * save or check that triggered it.
+ * "notifyOnDisable" is enabled (it switches mail and webhook), and a failing mail transport or
+ * webhook is logged but never breaks the save or check that triggered it. The webhook is called
+ * when "notifyWebhookUrl" is set, with the same digest/single rhythm as the mail.
  *
  * A singleton, so the check and the page guard share one queue within a request.
  */
@@ -39,6 +44,7 @@ class DisableNotificationService implements SingletonInterface
         private readonly ExtensionConfiguration $extensionConfiguration,
         private readonly MailerInterface $mailer,
         private readonly LoggerInterface $logger,
+        private readonly EventDispatcherInterface $eventDispatcher,
     ) {}
 
     /**
@@ -46,6 +52,8 @@ class DisableNotificationService implements SingletonInterface
      */
     public function queue(array $entry): void
     {
+        $this->eventDispatcher->dispatch(new RedirectDisabledEvent($entry));
+
         if (!$this->isEnabled()) {
             return;
         }
@@ -123,12 +131,27 @@ class DisableNotificationService implements SingletonInterface
     private function send(array $entries): void
     {
         $recipients = self::parseRecipients($this->getSetting('notifyRecipients'));
-        if ($recipients === []) {
-            $this->logger->warning('Redirect disable notification is enabled but no valid recipient is configured in "notifyRecipients".');
+        $webhookUrl = $this->getSetting('notifyWebhookUrl');
+        if ($recipients === [] && $webhookUrl === '') {
+            $this->logger->warning('Redirect disable notification is enabled but neither a valid recipient ("notifyRecipients") nor a webhook ("notifyWebhookUrl") is configured.');
 
             return;
         }
 
+        if ($recipients !== []) {
+            $this->sendMail($entries, $recipients);
+        }
+        if ($webhookUrl !== '') {
+            $this->callWebhook($entries, $webhookUrl);
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @param list<string> $recipients
+     */
+    private function sendMail(array $entries, array $recipients): void
+    {
         try {
             // @extensionScannerIgnoreLine own private method, not TypoScriptFrontendController::getLanguage()
             $email = $this->createEmail($entries, $this->getLanguage());
@@ -138,6 +161,90 @@ class DisableNotificationService implements SingletonInterface
             // A broken mail setup must never break the save, the check or the page deletion.
             // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
             $this->logger->error('Sending the redirect disable notification failed: ' . $exception->getMessage(), ['exception' => $exception]);
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     */
+    private function callWebhook(array $entries, string $url): void
+    {
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        if (!in_array($scheme, ['http', 'https'], true) || (string) parse_url($url, PHP_URL_HOST) === '') {
+            $this->logger->warning('The redirect disable webhook is ignored: "notifyWebhookUrl" must be an http(s) URL.');
+
+            return;
+        }
+
+        try {
+            $this->postJson($url, json_encode($this->buildWebhookPayload($entries), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        } catch (\Throwable $exception) {
+            // A broken webhook must never break the save, the check or the page deletion.
+            // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
+            $this->logger->error('Calling the redirect disable webhook failed: ' . $exception->getMessage(), ['exception' => $exception]);
+        }
+    }
+
+    /**
+     * "text" ({"text": "..."}) is understood by Slack, Mattermost, Rocket.Chat and similar incoming
+     * webhooks; "json" is a structured payload for your own endpoint.
+     *
+     * @param list<array<string, mixed>> $entries
+     * @return array<string, mixed>
+     */
+    private function buildWebhookPayload(array $entries): array
+    {
+        $siteName = (string) ($GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] ?? '');
+
+        if ($this->getSetting('notifyWebhookFormat') === 'json') {
+            return [
+                'event' => 'redirects_disabled',
+                'site' => $siteName,
+                'count' => count($entries),
+                'redirects' => array_map(static fn(array $entry): array => [
+                    'redirect_uid' => (int) ($entry['redirect_uid'] ?? 0),
+                    'source_host' => (string) ($entry['source_host'] ?? ''),
+                    'source_path' => (string) ($entry['source_path'] ?? ''),
+                    'target' => (string) ($entry['target'] ?? ''),
+                    'status_code' => (string) ($entry['status_code'] ?? ''),
+                    'reason' => (string) ($entry['reason'] ?? ''),
+                ], $entries),
+            ];
+        }
+
+        $lines = [sprintf(
+            '%s%d %s disabled',
+            $siteName !== '' ? $siteName . ': ' : '',
+            count($entries),
+            count($entries) === 1 ? 'redirect was' : 'redirects were'
+        )];
+        foreach ($entries as $entry) {
+            $lines[] = sprintf(
+                '- %s%s -> %s (%s)',
+                $entry['source_host'] ?? '',
+                $entry['source_path'] ?? '',
+                $entry['target'] ?? '',
+                $entry['reason'] ?? ''
+            );
+        }
+
+        return ['text' => implode("\n", $lines)];
+    }
+
+    /**
+     * Seam for tests; throws if the endpoint cannot be reached or answers with an error status.
+     */
+    protected function postJson(string $url, string $body): void
+    {
+        $response = GeneralUtility::makeInstance(RequestFactory::class)->request($url, 'POST', [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => $body,
+            'timeout' => 5,
+            'connect_timeout' => 3,
+            'http_errors' => false,
+        ]);
+        if ($response->getStatusCode() >= 400) {
+            throw new \RuntimeException('HTTP status ' . $response->getStatusCode());
         }
     }
 

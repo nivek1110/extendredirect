@@ -7,7 +7,21 @@ Usage
 =====
 
 The Redirects module (:guilabel:`Link Management > Redirects`) gains the broken-redirect
-filter, the CSV import and the disable log.
+filter, a "last checked" column and filter, the CSV import and export and the disable log.
+
+Disable log: check now
+======================
+
+Every entry of the disable log has a :guilabel:`Check now` button. It re-checks that redirect: a healthy
+one is enabled again, a broken one stays disabled. A redirect that was disabled by hand is never touched.
+
+CSV export
+==========
+
+:guilabel:`Export redirects` in the module's toolbar downloads all redirects as a semicolon separated
+CSV file in the format of the import (including the optional columns `respect_query_parameters`,
+`keep_query_parameters`, `force_https`, `is_regexp` and `disabled`). Cells that would be read as a
+formula by a spreadsheet are prefixed with an apostrophe.
 
 Commands
 ========

@@ -1,7 +1,7 @@
 # cat=basic; type=options[HTTP request=request,Database only (no HTTP request)=database]; label=Redirect check mode: "HTTP request" follows the redirect live over HTTP like a browser would; "Database only" resolves the target directly against the pages/redirects tables without firing any request.
 checkMode = request
 
-# cat=notifications; type=boolean; label=Send an email when a redirect is disabled: off by default. Applies to the health check (on save and via the command) and to the page delete/hide protection.
+# cat=notifications; type=boolean; label=Notify when a redirect is disabled (mail and/or webhook): off by default. Applies to the health check (on save and via the command) and to the page delete/hide protection.
 notifyOnDisable = 0
 
 # cat=notifications; type=string; label=Email recipients: comma or semicolon separated list of addresses. Invalid addresses are ignored; without a valid one nothing is sent. The sender is TYPO3's default mail sender ([MAIL][defaultMailFromAddress]).
@@ -12,3 +12,9 @@ notifyMode = digest
 
 # cat=notifications; type=options[English=en,German=de]; label=Mail language
 notifyLanguage = en
+
+# cat=notifications; type=string; label=Webhook URL: optional http(s) endpoint that gets a JSON POST when redirects are disabled (needs the switch above). Same rhythm as the mail (see "Mail frequency"). Empty = no webhook. A failing webhook is logged, never fatal.
+notifyWebhookUrl =
+
+# cat=notifications; type=options[Chat message {"text": ...} (Slack, Mattermost, Rocket.Chat)=text,Structured JSON=json]; label=Webhook payload format
+notifyWebhookFormat = text

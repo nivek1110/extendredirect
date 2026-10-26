@@ -21,9 +21,14 @@ Features
 *   **Page delete/hide protection** - redirects pointing to a deleted or hidden page are disabled
     with a logged reason.
 *   **Broken-redirect filter** in the Redirects module.
-*   **Disable log** - reason, source, target and timestamp of every automatic disabling.
-*   **CSV import** - semicolon-separated, with validation of hosts and duplicate source paths.
+*   **Last checked** column and filter in the Redirects module.
+*   **Disable log** - reason, source, target and timestamp of every automatic disabling, with a
+    "Check now" button per entry.
+*   **CSV import and export** - semicolon-separated, with validation of hosts and duplicate source
+    paths; an export can be edited and imported again.
 *   **Email notification** (optional) - a mail when a redirect is disabled, as one summary mail per
     run or one mail per redirect; off by default, see :ref:`configuration-notification`.
+*   **Webhook and PSR-14 event** - post disabled redirects to a chat or your own endpoint, or react to
+    :php:`RedirectDisabledEvent` in your own code.
 *   **Commands** - `extendredirect:checkredirects` and `extendredirect:cleanuplog`, both
     schedulable.

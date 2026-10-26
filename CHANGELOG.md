@@ -12,6 +12,15 @@ All notable changes to this project are documented here. The format follows
   can be edited and imported again. The CSV import accepts the optional columns `is_regexp` and `disabled` too.
 - Disable log: a "Check now" button per entry re-checks that redirect on demand. A healthy one is enabled again,
   a broken one stays disabled; redirects disabled by hand are never touched.
+- PSR-14 event `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`, dispatched for every redirect the health check
+  or the page delete/hide guard disables, so your own code can react to it.
+- Optional webhook for disabled redirects: the extension settings `notifyWebhookUrl` and `notifyWebhookFormat`
+  (`text` for Slack/Mattermost/Rocket.Chat, or structured `json`) post the same notification as the mail, with
+  the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
+
+### Changed
+- `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
+  if you instantiate it yourself).
 
 ## [1.1.2] - 2026-10-26
 

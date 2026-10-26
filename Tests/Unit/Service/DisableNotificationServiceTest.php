@@ -7,6 +7,7 @@ namespace Nivek1110\Extendredirect\Tests\Unit\Service;
 use Nivek1110\Extendredirect\Service\DisableNotificationService;
 use Nivek1110\Extendredirect\Tests\Support\RecordingMailer;
 use PHPUnit\Framework\TestCase;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mime\Email;
@@ -24,7 +25,7 @@ class DisableNotificationServiceTest extends TestCase
 
         // The real mail is a Fluid template that needs the full TYPO3 environment; here only the
         // decision *whether and how often* to send is under test, so a plain Email stands in.
-        return new class ($extensionConfiguration, $mailer, new NullLogger()) extends DisableNotificationService {
+        return new class ($extensionConfiguration, $mailer, new NullLogger(), $this->createStub(EventDispatcherInterface::class)) extends DisableNotificationService {
             protected function createEmail(array $entries, string $language): Email
             {
                 return (new Email())->subject((string) count($entries))->text('x');

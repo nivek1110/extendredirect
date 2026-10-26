@@ -9,6 +9,7 @@ use Nivek1110\Extendredirect\Service\DisableNotificationService;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
 use Nivek1110\Extendredirect\Service\PageRedirectGuardService;
 use Nivek1110\Extendredirect\Tests\Support\RecordingMailer;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mime\Email;
@@ -47,7 +48,8 @@ class DisableNotificationTest extends FunctionalTestCase
             new DisableNotificationService(
                 GeneralUtility::makeInstance(ExtensionConfiguration::class),
                 $this->mailer,
-                new NullLogger()
+                new NullLogger(),
+                GeneralUtility::makeInstance(EventDispatcherInterface::class)
             )
         );
     }
