@@ -1,9 +1,6 @@
 # cat=basic; type=options[HTTP request=request,Database only (no HTTP request)=database]; label=Redirect check mode: "HTTP request" follows the redirect live over HTTP like a browser would; "Database only" resolves the target directly against the pages/redirects tables without firing any request.
 checkMode = request
 
-# cat=basic; type=boolean; label=Check targets with capture groups ($1): a regex redirect with a target like /news/$1 cannot be requested, so only the fixed part before the first $ (/news) is checked: at least one visible page must exist at or below it, in the site and language of the target. Targets below /fileadmin, /uploads, /typo3temp, /typo3conf and /_assets are skipped. A heuristic - switch it off if a redirect gets disabled although it works (for example a target that is a plugin route and no page).
-checkDynamicTargets = 1
-
 # cat=notifications; type=boolean; label=Notify when a redirect is disabled (mail and/or webhook): off by default. Applies to the health check (on save and via the command) and to the page delete/hide protection.
 notifyOnDisable = 0
 

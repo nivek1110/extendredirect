@@ -135,9 +135,8 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame('https://other.example.org/somewhere', $row['target']);
     }
 
-    public function testTargetWithCaptureGroupPlaceholderIsLeftAloneWhenTheCheckIsSwitchedOff(): void
+    public function testTargetWithCaptureGroupPlaceholderIsLeftAlone(): void
     {
-        $this->disableDynamicTargetCheck();
         $uid = $this->insertRedirect('#^/old/(.*)$#', '/new/$1', ['is_regexp' => 1]);
 
         $this->subject->runHealthCheck();
@@ -665,106 +664,6 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $this->subject->runBulkCheck();
 
         self::assertSame(1, (int) $this->redirect($first)['disabled']);
-    }
-
-    private function disableDynamicTargetCheck(): void
-    {
-        $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkDynamicTargets'] = '0';
-    }
-
-    /**
-     * @return array<string, array{0: string, 1: list<string>, 2: bool}> target, slugs of existing pages, expected healthy
-     */
-    public static function dynamicTargetProvider(): array
-    {
-        return [
-            'a page below the fixed part exists' => ['/new/$1', ['/new/a'], true],
-            'the page of the fixed part itself exists' => ['/new/$1', ['/new'], true],
-            'nothing below the fixed part' => ['/new/$1', ['/other/a'], false],
-            'only a page that merely starts with the same letters' => ['/new/$1', ['/new-other'], false],
-            'a partial last segment is not compared' => ['/new/product-$1', ['/new/a'], true],
-            'no fixed part: nothing to compare' => ['/$1', [], true],
-            'capture group right behind the host: nothing to compare' => ['https://other.example/$1', [], true],
-            'a target on another host is left alone' => ['https://elsewhere.example/gone/$1', [], true],
-            'deeper fixed part' => ['/a/b/$1', ['/a/b/c'], true],
-            'deeper fixed part missing' => ['/a/b/$1', ['/a/x'], false],
-        ];
-    }
-
-    /**
-     * @param list<string> $slugs
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('dynamicTargetProvider')]
-    public function testATargetWithACaptureGroupIsCheckedByItsFixedPart(string $target, array $slugs, bool $expectedHealthy): void
-    {
-        foreach ($slugs as $slug) {
-            $this->insertPage($slug);
-        }
-        $uid = $this->insertRedirect('#^/old/(.*)$#', $target, ['is_regexp' => 1]);
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame($expectedHealthy ? 0 : 1, (int) $this->redirect($uid)['disabled'], $target);
-    }
-
-    public function testATargetWithACaptureGroupIsLeftAloneWhenTheCheckIsSwitchedOff(): void
-    {
-        $this->disableDynamicTargetCheck();
-        $uid = $this->insertRedirect('#^/old/(.*)$#', '/nothing-here/$1', ['is_regexp' => 1]);
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
-    }
-
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function nonPageTargetProvider(): array
-    {
-        return [
-            'files' => ['/fileadmin/old/$1'],
-            'uploads' => ['/uploads/$1'],
-            'typo3temp' => ['/typo3temp/assets/$1'],
-            'extension assets' => ['/_assets/$1'],
-        ];
-    }
-
-    #[\PHPUnit\Framework\Attributes\DataProvider('nonPageTargetProvider')]
-    public function testATargetWithACaptureGroupPointingAtFilesIsNotAPageAndLeftAlone(string $target): void
-    {
-        $uid = $this->insertRedirect('#^/old/(.*)$#', $target, ['is_regexp' => 1]);
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame(0, (int) $this->redirect($uid)['disabled'], $target);
-    }
-
-    public function testTheFixedPartOfADynamicTargetIsLookedUpInTheLanguageOfItsPrefix(): void
-    {
-        $root = $this->createMultilingualSite();
-        $english = $this->insertOtherPage($root, '/neu/a');
-        $this->insertOtherPage($root, '/neu/a', 1, $english);
-        $this->insertOtherPage($root, '/only-english/a');
-        $translated = $this->insertRedirect('#^/x/(.*)$#', '/de/neu/$1', ['is_regexp' => 1, 'source_host' => 'other.example']);
-        $untranslated = $this->insertRedirect('#^/y/(.*)$#', '/de/only-english/$1', ['is_regexp' => 1, 'source_host' => 'other.example']);
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame(0, (int) $this->redirect($translated)['disabled']);
-        self::assertSame(1, (int) $this->redirect($untranslated)['disabled'], 'the section exists in English only');
-    }
-
-    public function testTheFixedPartOfADynamicTargetStaysInsideTheSiteOfTheSourceHost(): void
-    {
-        $this->insertPage('/new/a'); // main site only
-        $root = $this->createMultilingualSite();
-        $this->insertOtherPage($root, '/unrelated');
-        $uid = $this->insertRedirect('#^/x/(.*)$#', '/new/$1', ['is_regexp' => 1, 'source_host' => 'other.example']);
-
-        $this->subject->runBulkCheck();
-
-        self::assertSame(1, (int) $this->redirect($uid)['disabled'], 'the section exists on the main site, not on other.example');
     }
 
     /**

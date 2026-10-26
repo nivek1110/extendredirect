@@ -41,9 +41,6 @@ class HealthCheckService
 
     private const MAX_CHAIN_HOPS = 10;
 
-    /** First path segments that are files or assets, not pages: a fixed part below them is never checked. */
-    private const NON_PAGE_PATHS = ['fileadmin', 'uploads', 'typo3temp', 'typo3conf', 'typo3', '_assets'];
-
     /**
      * Context aspects the frontend sub-request may overwrite and that the surrounding
      * (backend) request must get back unchanged - see redirectFollower().
@@ -580,8 +577,8 @@ class HealthCheckService
         $target = (string) ($redirect['target'] ?? '');
 
         if (!str_starts_with($target, 't3://') && str_contains($target, '$')) {
-            // Dynamic capture-group target: nothing concrete to request or resolve.
-            return $this->checkDynamicTarget($target, (string) ($redirect['source_host'] ?? '*'));
+            // Dynamic capture-group target - nothing concrete to check against.
+            return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
         }
 
         // The same site- and language-aware lookup as in "database" mode, but no chain following: a regex source
@@ -617,112 +614,6 @@ class HealthCheckService
      * redirect live over HTTP; "database" resolves everything against the
      * pages/sys_redirect tables instead, without firing any request.
      */
-    /**
-     * On unless switched off in the extension settings (also if the setting was never saved).
-     */
-    protected function isDynamicTargetCheckEnabled(): bool
-    {
-        try {
-            $value = $this->extensionConfiguration->get('extendredirect', 'checkDynamicTargets');
-        } catch (\Exception) {
-            return true;
-        }
-
-        return !in_array(strtolower(trim((string) $value)), ['0', 'false', 'off', ''], true);
-    }
-
-    /**
-     * A target with a capture group ("/news/$1") has no concrete URL, so it cannot be requested or resolved. With
-     * "checkDynamicTargets" on (the default), its fixed part - the path up to the last slash before the first "$" - must still
-     * exist: at least one visible page at or below it, in the site and language the target is in. Switched off, without
-     * a fixed part (/$1, https://host/$1), on another host or below a files path (/fileadmin/...) there is nothing to
-     * compare and it counts as healthy.
-     *
-     * @return array{redirectError: bool, redirectCount: int|string, message: string}
-     */
-    protected function checkDynamicTarget(string $target, string $sourceHost): array
-    {
-        $healthy = ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
-        if (!$this->isDynamicTargetCheckEnabled()) {
-            return $healthy;
-        }
-
-        $fixedPart = substr($target, 0, (int) strpos($target, '$'));
-        $host = parse_url($fixedPart, PHP_URL_HOST);
-        $path = (string) parse_url($fixedPart, PHP_URL_PATH);
-        $section = '/' . trim(substr($path, 0, (int) strrpos($path, '/') + 1), '/');
-        if ($section === '/' || in_array(strtolower(explode('/', trim($section, '/'))[0]), self::NON_PAGE_PATHS, true)) {
-            return $healthy;
-        }
-
-        $expectedSite = null;
-        if (is_string($host)) {
-            $expectedSite = $this->findSiteByHost($host);
-            if ($expectedSite === null) {
-                return $healthy;
-            }
-        } elseif ($sourceHost !== '*') {
-            $expectedSite = $this->findSiteByHost($sourceHost);
-        }
-
-        $sites = $expectedSite !== null ? [$expectedSite] : array_values($this->siteFinder->getAllSites());
-        if ($sites === []) {
-            $found = $this->sectionExists($section, null, null);
-        } else {
-            $found = false;
-            $languageHost = is_string($host) ? $host : $sourceHost;
-            foreach ($sites as $site) {
-                [$languageId, $lookupPath] = $this->detectPathLanguage($site, $languageHost, $section);
-                if ($this->sectionExists($lookupPath, $site, $languageId)) {
-                    $found = true;
-                    break;
-                }
-            }
-        }
-
-        return $found
-            ? $healthy
-            : ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
-    }
-
-    /**
-     * Whether a visible page lives at the path or below it (the path itself, or "path/...").
-     */
-    protected function sectionExists(string $path, ?Site $site, ?int $languageId): bool
-    {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll()
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-            ->add(GeneralUtility::makeInstance(HiddenRestriction::class));
-        $expr = $queryBuilder->expr();
-
-        $constraints = [
-            $expr->or(
-                $expr->eq('slug', $queryBuilder->createNamedParameter($path)),
-                $expr->like('slug', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($path) . '/%'))
-            ),
-        ];
-        if ($languageId !== null) {
-            $constraints[] = $expr->in('sys_language_uid', [$languageId, -1]);
-        }
-
-        $candidates = $queryBuilder
-            ->select('uid')
-            ->from('pages')
-            ->where(...$constraints)
-            ->setMaxResults(500)
-            ->executeQuery()
-            ->fetchFirstColumn();
-
-        foreach ($candidates as $uid) {
-            if ($site === null || $this->findSiteRootUid((int) $uid) === $site->getRootPageId()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     protected function getCheckMode(): string
     {
         try {
@@ -763,10 +654,7 @@ class HealthCheckService
 
         while (true) {
             if (str_contains($target, '$')) {
-                // Dynamic capture-group target: nothing concrete to resolve.
-                $dynamic = $this->checkDynamicTarget($target, $sourceHost);
-
-                return ['redirectError' => $dynamic['redirectError'], 'redirectCount' => $dynamic['redirectError'] ? '-' : $hops, 'message' => $dynamic['message']];
+                return ['redirectError' => false, 'redirectCount' => $hops, 'message' => ''];
             }
 
             $resolution = $this->resolveTargetPage($target, $sourceHost);
