@@ -107,5 +107,10 @@ delete/hide protection). The redirect is already disabled when listeners run.
     }
 
 ..  note::
+    Mail transport and webhook call run after the response: under PHP-FPM the request of the editor is finished
+    first (`fastcgi_finish_request()`), so a slow SMTP server or endpoint never keeps the editor waiting. In the CLI
+    (command, Scheduler) they are sent at once; without PHP-FPM the request still waits.
+
+..  note::
     Nothing is sent by `--dry-run`. A failing mail transport is only logged and never breaks a save, a
     check or a page deletion.

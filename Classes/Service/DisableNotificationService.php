@@ -162,12 +162,27 @@ class DisableNotificationService implements SingletonInterface
             // @extensionScannerIgnoreLine own private method, not TypoScriptFrontendController::getLanguage()
             $email = $this->createEmail($entries, $this->getLanguage());
             $email->to(...array_map(static fn(string $address): Address => new Address($address), $recipients));
-            $this->mailer->send($email);
         } catch (\Throwable $exception) {
-            // A broken mail setup must never break the save, the check or the page deletion.
-            // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
-            $this->logger->error('Sending the redirect disable notification failed: ' . $exception->getMessage(), ['exception' => $exception]);
+            $this->logSendingFailure($exception);
+
+            return;
         }
+
+        // The mail is built now (it needs the request), the slow SMTP transport runs after the response.
+        $this->runAfterResponse(function () use ($email): void {
+            try {
+                $this->mailer->send($email);
+            } catch (\Throwable $exception) {
+                $this->logSendingFailure($exception);
+            }
+        });
+    }
+
+    private function logSendingFailure(\Throwable $exception): void
+    {
+        // A broken mail setup must never break the save, the check or the page deletion.
+        // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
+        $this->logger->error('Sending the redirect disable notification failed: ' . $exception->getMessage(), ['exception' => $exception]);
     }
 
     /**
@@ -183,12 +198,51 @@ class DisableNotificationService implements SingletonInterface
         }
 
         try {
-            $this->postJson($url, json_encode($this->buildWebhookPayload($entries), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $body = json_encode($this->buildWebhookPayload($entries), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $exception) {
-            // A broken webhook must never break the save, the check or the page deletion.
-            // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
-            $this->logger->error('Calling the redirect disable webhook failed: ' . $exception->getMessage(), ['exception' => $exception]);
+            $this->logWebhookFailure($exception);
+
+            return;
         }
+
+        // The slow HTTP call runs after the response, so an editor never waits for the endpoint.
+        $this->runAfterResponse(function () use ($url, $body): void {
+            try {
+                $this->postJson($url, $body);
+            } catch (\Throwable $exception) {
+                $this->logWebhookFailure($exception);
+            }
+        });
+    }
+
+    private function logWebhookFailure(\Throwable $exception): void
+    {
+        // A broken webhook must never break the save, the check or the page deletion.
+        // @extensionScannerIgnoreLine PSR-3 LoggerInterface::error(), not the core API of the same name
+        $this->logger->error('Calling the redirect disable webhook failed: ' . $exception->getMessage(), ['exception' => $exception]);
+    }
+
+    /**
+     * Runs slow work (SMTP, HTTP) once the response is out. Under PHP-FPM the response is finished first
+     * (fastcgi_finish_request) and the task runs while the worker is still busy but the browser is not waiting.
+     * In the CLI (command, Scheduler) nobody waits, and without FPM there is no way to finish the response
+     * early: both run the task at once.
+     *
+     * @param callable(): void $task must catch its own errors
+     */
+    protected function runAfterResponse(callable $task): void
+    {
+        if (PHP_SAPI === 'cli' || !function_exists('fastcgi_finish_request')) {
+            $task();
+
+            return;
+        }
+
+        register_shutdown_function(static function () use ($task): void {
+            // First: send the finished response to the browser and close the connection.
+            fastcgi_finish_request();
+            $task();
+        });
     }
 
     /**

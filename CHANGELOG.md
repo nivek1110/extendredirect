@@ -63,6 +63,9 @@ All notable changes to this project are documented here. The format follows
   until the cache was flushed, and the next check, which requests the source URL, disabled it again.
 
 ### Changed
+- The mail transport and the webhook call run after the response (PHP-FPM: `fastcgi_finish_request()`), so a slow SMTP
+  server or webhook endpoint no longer keeps an editor waiting when a save or a page change disables a redirect. In the
+  CLI (command, Scheduler) they are sent at once, and without PHP-FPM nothing changes.
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).
 

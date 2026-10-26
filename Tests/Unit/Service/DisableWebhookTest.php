@@ -30,6 +30,17 @@ class DisableWebhookTest extends TestCase
 
     private bool $webhookFails = false;
 
+    private RecordingMailer $mailer;
+
+    /** Collect the "after the response" tasks instead of running them at once. */
+    private bool $deferTasks = false;
+
+    /** Use the real runAfterResponse() (which runs at once in the CLI) instead of the test's. */
+    private bool $useRealDeferral = false;
+
+    /** @var list<callable> */
+    private array $tasks = [];
+
     /** @var \ArrayObject<string, bool> switches of the fake event dispatcher */
     private \ArrayObject $dispatcherState;
 
@@ -42,6 +53,10 @@ class DisableWebhookTest extends TestCase
         $this->posts = [];
         $this->logged = new \ArrayObject();
         $this->webhookFails = false;
+        $this->mailer = new RecordingMailer();
+        $this->deferTasks = false;
+        $this->useRealDeferral = false;
+        $this->tasks = [];
 
         $extensionConfiguration = $this->createStub(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn($configuration);
@@ -75,7 +90,7 @@ class DisableWebhookTest extends TestCase
         };
         $test = $this;
 
-        return new class ($extensionConfiguration, new RecordingMailer(), $logger, $dispatcher, $test) extends DisableNotificationService {
+        return new class ($extensionConfiguration, $this->mailer, $logger, $dispatcher, $test) extends DisableNotificationService {
             public function __construct(
                 ExtensionConfiguration $extensionConfiguration,
                 RecordingMailer $mailer,
@@ -95,7 +110,32 @@ class DisableWebhookTest extends TestCase
             {
                 $this->test->recordPost($url, $body);
             }
+
+            protected function runAfterResponse(callable $task): void
+            {
+                if ($this->test->usesRealDeferral()) {
+                    parent::runAfterResponse($task);
+
+                    return;
+                }
+                $this->test->defer($task);
+            }
         };
+    }
+
+    public function usesRealDeferral(): bool
+    {
+        return $this->useRealDeferral;
+    }
+
+    public function defer(callable $task): void
+    {
+        if ($this->deferTasks) {
+            $this->tasks[] = $task;
+
+            return;
+        }
+        $task();
     }
 
     public function recordPost(string $url, string $body): void
@@ -265,5 +305,47 @@ class DisableWebhookTest extends TestCase
         self::assertCount(1, $this->events, 'the event was dispatched');
         self::assertCount(1, $this->posts, 'the webhook still goes out');
         self::assertStringContainsString('error: A listener of RedirectDisabledEvent failed: listener exploded', implode("\n", $this->logged->getArrayCopy()));
+    }
+
+    public function testMailAndWebhookGoOutAfterTheResponse(): void
+    {
+        $service = $this->createService($this->webhook('text', 'single') + ['notifyRecipients' => 'ops@example.com']);
+        $this->deferTasks = true;
+
+        $service->queue($this->entry(1));
+
+        self::assertSame([], $this->posts, 'the webhook waits for the end of the request');
+        self::assertCount(0, $this->mailer->emails(), 'so does the mail transport');
+        self::assertCount(2, $this->tasks);
+
+        foreach ($this->tasks as $task) {
+            $task();
+        }
+        self::assertCount(1, $this->posts);
+        self::assertCount(1, $this->mailer->emails());
+    }
+
+    public function testAFailureInADeferredTaskIsLoggedAndNeverThrown(): void
+    {
+        $service = $this->createService($this->webhook('text', 'single'));
+        $this->deferTasks = true;
+        $this->webhookFails = true;
+
+        $service->queue($this->entry(1));
+        foreach ($this->tasks as $task) {
+            $task();
+        }
+
+        self::assertStringContainsString('error: Calling the redirect disable webhook failed: connection refused', implode("\n", $this->logged->getArrayCopy()));
+    }
+
+    public function testInTheCliNothingIsDeferred(): void
+    {
+        $service = $this->createService($this->webhook('text', 'single'));
+        $this->useRealDeferral = true;
+
+        $service->queue($this->entry(1));
+
+        self::assertCount(1, $this->posts, 'no browser waits in the CLI, so it is sent at once');
     }
 }

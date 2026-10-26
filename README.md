@@ -141,6 +141,10 @@ Notification settings (same place, category *notifications*):
 | `notifyWebhookUrl` | string  | Optional http(s) URL that receives a JSON `POST` with the same rhythm as the mail. Empty = no webhook. Calls time out after 5 seconds; failures are logged, never fatal. |
 | `notifyWebhookFormat` | options | `text` (default): `{"text": "..."}` as understood by Slack, Mattermost and Rocket.Chat incoming webhooks. `json`: `{"event": "redirects_disabled", "site": "...", "count": 1, "redirects": [{"redirect_uid", "source_host", "source_path", "target", "status_code", "reason"}]}`. |
 
+Mail transport and webhook call run **after the response**: under PHP-FPM the editor's request is finished first
+(`fastcgi_finish_request()`), so a slow SMTP server or webhook endpoint never keeps the editor waiting. In the CLI
+(command, Scheduler) it is sent at once, and without PHP-FPM the request still waits for it.
+
 The webhook URL is configured by administrators only; it is not validated beyond being http(s), so do not
 point it at internal services you do not control.
 
