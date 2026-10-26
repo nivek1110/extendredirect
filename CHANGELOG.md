@@ -5,11 +5,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
 ### Added
 - Optional email notification when a redirect is disabled (health check and page delete/hide protection):
   `notifyOnDisable` (off by default), `notifyRecipients`, `notifyMode` (`digest` = one summary mail per run,
   `single` = one mail per redirect) and `notifyLanguage` (`en`/`de`). No mail on `--dry-run`; a failing mail
   transport is logged and never breaks the save or check.
+
+### Upgrade notes
+- No database changes. The new options are in the extension configuration (category *notifications*);
+  the notification stays off until `notifyOnDisable` is enabled.
 
 ## [1.0.0] - 2026-10-23
 
