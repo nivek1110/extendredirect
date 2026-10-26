@@ -23,6 +23,17 @@ Extension configuration
         `request` mode needs a reachable, correctly configured site base URL
         (Site Configuration > Base). Use `database` mode for local or offline environments.
 
+..  confval:: checkDynamicTargets
+    :name: confval-checkdynamictargets
+    :type: boolean
+    :Default: 1
+
+    A regex redirect with a capture group in the target (`/news/$1`) cannot be requested, so only the fixed part
+    before the first `$` is checked: at least one visible page must exist at or below `/news`, in the site and
+    language of the target. Targets below `/fileadmin`, `/uploads`, `/typo3temp`, `/typo3conf` and `/_assets` are
+    skipped. A heuristic: switch it off if a working redirect gets disabled, for example because its target is a
+    plugin route and no page.
+
 ..  _configuration-notification:
 
 Email notification

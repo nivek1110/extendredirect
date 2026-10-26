@@ -32,10 +32,18 @@ redirect works on the live site right away and a disabled one stops redirecting.
 Regex redirects
 ===============
 
-A regex source (`is_regexp`) has no concrete URL, so there is nothing to request: only the **target** is checked,
-and only if it is concrete - a page link or a path that must resolve to a visible page in its site and language, or
-a target on another host, which is left alone. A target with a capture group (:php:`/new/$1`) cannot be verified and
-counts as healthy; the pattern itself is not tested either.
+A regex source (`is_regexp`) has no concrete URL, so it is never requested or tested: only the **target** is checked.
+
+*   A concrete target (page link or path) must resolve to a visible page in its site and language; a target on another
+    host is left alone.
+*   A target with a capture group (:php:`/news/$1`) is checked by its **fixed part**: the path up to the last slash
+    before the first `$` (`/news`) must still exist - at least one visible page at or below it, in the site and
+    language of the target (a prefix such as `/de/` selects the translations). Nothing is compared for a target
+    without a fixed part (:php:`/$1`, :php:`https://host/$1`), for a target on another host, and below `/fileadmin`,
+    `/uploads`, `/typo3temp`, `/typo3conf` and `/_assets`, which are files and no pages.
+*   This is a heuristic: it notices that a whole section is gone, not whether the one URL of a request exists. If a
+    redirect gets disabled although it works - for example because the target is a plugin route and no page - switch
+    it off with the extension setting `checkDynamicTargets`.
 
 Several sites and languages
 ===========================

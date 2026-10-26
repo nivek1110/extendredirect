@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Regex redirects with a capture group in the target (`/news/$1`) are no longer always "healthy": the fixed part before
+  the first `$` (`/news`) must still exist - at least one visible page at or below it, in the site and language of the
+  target. This finds a section that was deleted. It is skipped for targets without a fixed part (`/$1`), on another
+  host and below `/fileadmin`, `/uploads`, `/typo3temp`, `/typo3conf` and `/_assets`. The new extension setting
+  `checkDynamicTargets` (on by default) switches it off.
+
 ### Fixed
 - Languages with a fallback chain: a page counts as available in a language if it is translated into it or one of the
   languages of its fallback chain (`fallbacks`) has it - the default language always does. This follows TYPO3, which

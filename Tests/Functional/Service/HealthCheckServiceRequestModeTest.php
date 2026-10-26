@@ -725,4 +725,29 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame('healthy', $this->check($service, $uid)['status']);
         self::assertSame(['https://other.example/de/nur-deutsch'], $this->requestedUrls->getArrayCopy());
     }
+
+    public function testARegexTargetWithACaptureGroupIsCheckedByItsFixedPart(): void
+    {
+        $this->insertPage($this->rootUid, '/news/first');
+        $present = $this->insertRedirect('#^/a/(.*)$#', '/news/$1', ['is_regexp' => 1]);
+        $gone = $this->insertRedirect('#^/b/(.*)$#', '/archive/$1', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($present)['disabled']);
+        self::assertSame(1, (int) $this->redirect($gone)['disabled']);
+        self::assertCount(0, $this->requestedUrls, 'still no request: the source is a pattern');
+    }
+
+    public function testARegexTargetWithACaptureGroupIsLeftAloneWhenTheCheckIsSwitchedOff(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkDynamicTargets'] = '0';
+        $uid = $this->insertRedirect('#^/b/(.*)$#', '/archive/$1', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
 }
