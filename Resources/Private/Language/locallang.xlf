@@ -187,6 +187,42 @@
             <trans-unit id="command.cleanupLog.option.days">
                 <source>Delete log entries older than this many days</source>
             </trans-unit>
+
+            <trans-unit id="mail.title">
+                <source>Redirects disabled</source>
+            </trans-unit>
+
+            <trans-unit id="mail.subject.single">
+                <source>Redirect disabled: %s</source>
+            </trans-unit>
+
+            <trans-unit id="mail.subject.digest">
+                <source>%d redirects were disabled</source>
+            </trans-unit>
+
+            <trans-unit id="mail.intro.single">
+                <source>The following redirect was disabled automatically.</source>
+            </trans-unit>
+
+            <trans-unit id="mail.intro.digest">
+                <source>%d redirects were disabled automatically.</source>
+            </trans-unit>
+
+            <trans-unit id="mail.field.source">
+                <source>Source</source>
+            </trans-unit>
+
+            <trans-unit id="mail.field.target">
+                <source>Target</source>
+            </trans-unit>
+
+            <trans-unit id="mail.field.reason">
+                <source>Reason</source>
+            </trans-unit>
+
+            <trans-unit id="mail.outro">
+                <source>Details are listed under "Disable log" in the Redirects module, where you can review and re-enable them.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

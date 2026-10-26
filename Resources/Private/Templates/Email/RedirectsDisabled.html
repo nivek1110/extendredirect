@@ -1,0 +1,27 @@
+<f:layout name="SystemEmail" />
+<f:section name="Title"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.title" languageKey="{language}" /></f:section>
+<f:section name="Main">
+    <p>
+        <f:if condition="{count} > 1">
+            <f:then><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.intro.digest" languageKey="{language}" arguments="{0: count}" /></f:then>
+            <f:else><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.intro.single" languageKey="{language}" /></f:else>
+        </f:if>
+    </p>
+    <f:for each="{entries}" as="entry">
+        <table cellpadding="4" cellspacing="0" style="margin-bottom: 16px;">
+            <tr>
+                <td><strong><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.source" languageKey="{language}" /></strong></td>
+                <td>{entry.source_host}{entry.source_path}</td>
+            </tr>
+            <tr>
+                <td><strong><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.target" languageKey="{language}" /></strong></td>
+                <td>{entry.target}</td>
+            </tr>
+            <tr>
+                <td><strong><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.reason" languageKey="{language}" /></strong></td>
+                <td>{entry.reason}</td>
+            </tr>
+        </table>
+    </f:for>
+    <p><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.outro" languageKey="{language}" /></p>
+</f:section>

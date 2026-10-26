@@ -64,6 +64,8 @@ class HealthCheckService
             if ($redirect['disabled'] === 0) {
                 $this->updateRedirect($redirect, $check);
             }
+            GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
+
             return $check;
         }
 
@@ -128,6 +130,9 @@ class HealthCheckService
                 usleep($delayMs * 1000);
             }
         }
+
+        // One summary mail for everything this run disabled (a no-op in "single" mode or when off).
+        GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
 
         return $result;
     }
@@ -220,8 +225,7 @@ class HealthCheckService
      */
     protected function logDisable(array $redirect, array $check): void
     {
-        $logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
-        $logRepository->add([
+        $entry = [
             'pid' => 0,
             'crdate' => GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp'),
             'redirect_uid' => (int) $redirect['uid'],
@@ -230,7 +234,9 @@ class HealthCheckService
             'target' => (string) ($redirect['target'] ?? ''),
             'status_code' => (string) ($check['redirectCount'] ?? ''),
             'reason' => (string) ($check['message'] ?? ''),
-        ]);
+        ];
+        GeneralUtility::makeInstance(DisableLogRepository::class)->add($entry);
+        GeneralUtility::makeInstance(DisableNotificationService::class)->queue($entry);
     }
 
     protected function redirectFollower(string $location): ResponseInterface

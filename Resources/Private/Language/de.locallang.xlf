@@ -265,6 +265,51 @@
                 <source>Delete log entries older than this many days</source>
                 <target>Log-Einträge löschen, die älter als diese Anzahl Tage sind</target>
             </trans-unit>
+
+            <trans-unit id="mail.title">
+                <source>Redirects disabled</source>
+                <target>Redirects deaktiviert</target>
+            </trans-unit>
+
+            <trans-unit id="mail.subject.single">
+                <source>Redirect disabled: %s</source>
+                <target>Redirect deaktiviert: %s</target>
+            </trans-unit>
+
+            <trans-unit id="mail.subject.digest">
+                <source>%d redirects were disabled</source>
+                <target>%d Redirects wurden deaktiviert</target>
+            </trans-unit>
+
+            <trans-unit id="mail.intro.single">
+                <source>The following redirect was disabled automatically.</source>
+                <target>Der folgende Redirect wurde automatisch deaktiviert.</target>
+            </trans-unit>
+
+            <trans-unit id="mail.intro.digest">
+                <source>%d redirects were disabled automatically.</source>
+                <target>%d Redirects wurden automatisch deaktiviert.</target>
+            </trans-unit>
+
+            <trans-unit id="mail.field.source">
+                <source>Source</source>
+                <target>Quelle</target>
+            </trans-unit>
+
+            <trans-unit id="mail.field.target">
+                <source>Target</source>
+                <target>Ziel</target>
+            </trans-unit>
+
+            <trans-unit id="mail.field.reason">
+                <source>Reason</source>
+                <target>Grund</target>
+            </trans-unit>
+
+            <trans-unit id="mail.outro">
+                <source>Details are listed under "Disable log" in the Redirects module, where you can review and re-enable them.</source>
+                <target>Details stehen im Redirects-Modul unter "Disable log". Dort können die Redirects geprüft und wieder aktiviert werden.</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

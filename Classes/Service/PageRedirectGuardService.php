@@ -33,6 +33,9 @@ class PageRedirectGuardService
         foreach ($redirects as $redirect) {
             $this->disableRedirectForTargetPage($redirect, $reasonKey, $redirectRepository);
         }
+
+        // One summary mail for all redirects of this page (a no-op in "single" mode or when off).
+        GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
     }
 
     /**
@@ -46,8 +49,7 @@ class PageRedirectGuardService
 
         $redirectRepository->disable((int) $redirect['uid']);
 
-        $logRepository = GeneralUtility::makeInstance(DisableLogRepository::class);
-        $logRepository->add([
+        $entry = [
             'pid' => 0,
             'crdate' => GeneralUtility::makeInstance(Context::class)->getPropertyFromAspect('date', 'timestamp'),
             'redirect_uid' => (int) $redirect['uid'],
@@ -56,7 +58,9 @@ class PageRedirectGuardService
             'target' => (string) ($redirect['target'] ?? ''),
             'status_code' => '',
             'reason' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:' . $reasonKey),
-        ]);
+        ];
+        GeneralUtility::makeInstance(DisableLogRepository::class)->add($entry);
+        GeneralUtility::makeInstance(DisableNotificationService::class)->queue($entry);
     }
 
     protected function findPageSlug(int $pageUid): ?string

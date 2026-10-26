@@ -1,0 +1,9 @@
+<f:layout name="SystemEmail" />
+<f:section name="Title"><f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.title" languageKey="{language}" /></f:format.raw></f:section>
+<f:section name="Main"><f:if condition="{count} > 1"><f:then><f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.intro.digest" languageKey="{language}" arguments="{0: count}" /></f:format.raw></f:then><f:else><f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.intro.single" languageKey="{language}" /></f:format.raw></f:else></f:if>
+<f:for each="{entries}" as="entry">
+* <f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.source" languageKey="{language}" /></f:format.raw>: {entry.source_host -> f:format.raw()}{entry.source_path -> f:format.raw()}
+  <f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.target" languageKey="{language}" /></f:format.raw>: {entry.target -> f:format.raw()}
+  <f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.field.reason" languageKey="{language}" /></f:format.raw>: {entry.reason -> f:format.raw()}
+</f:for>
+<f:format.raw><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:mail.outro" languageKey="{language}" /></f:format.raw></f:section>
