@@ -71,6 +71,7 @@
                     <th><f:render section="listHeaderSorting" arguments="{field: 'lasthiton', label: 'sys_redirect.lasthiton', demand: demand, moduleRoute: moduleRoute}"/></th>
                 </f:if>
                 <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:table.redirectCounter" /></th>
+                <th><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:table.lastChecked" /></th>
                 <th></th>
             </tr>
             </thead>
@@ -110,6 +111,12 @@
                         (<f:if condition="{pageId}"><f:translate key="LLL:EXT:redirects/Resources/Private/Language/locallang_module_redirect.xlf:pageID"/>: {pageId},
                         </f:if><f:translate key="LLL:EXT:redirects/Resources/Private/Language/locallang_module_redirect.xlf:destination_status_code"/>: {redirect.target_statuscode})</td>
                     <td>{redirect.redirect_count}</td>
+                    <td>
+                        <f:if condition="{redirect.last_checked}">
+                            <f:then><f:format.date format="d.m.Y H:i">@{redirect.last_checked}</f:format.date></f:then>
+                            <f:else><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:table.lastChecked.never" /></f:else>
+                        </f:if>
+                    </td>
                     <f:if condition="{showHitCounter}">
                         <td>
                             <f:if condition="!{redirect.disable_hitcount}">
@@ -223,6 +230,16 @@
                 <select id="demand-target-broken-redirect" class="form-select" name="demand[broken_redirect]" data-on-change="submit">
                     <option value="0"><f:translate key="LLL:EXT:redirects/Resources/Private/Language/locallang_module_redirect.xlf:filter.source_host.showAll"/></option>
                     <option value="1" {f:if(condition: '{demand.brokenRedirect} == 1', then: 'selected')}><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.brokenRedirect.error" /></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="demand-last-checked" class="form-label"><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.lastChecked.label" /></label>
+                <select id="demand-last-checked" class="form-select" name="demand[last_checked]" data-on-change="submit">
+                    <option value=""><f:translate key="LLL:EXT:redirects/Resources/Private/Language/locallang_module_redirect.xlf:filter.source_host.showAll"/></option>
+                    <option value="never" {f:if(condition: '{demand.lastChecked} == never', then: 'selected')}><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.lastChecked.never" /></option>
+                    <option value="stale1" {f:if(condition: '{demand.lastChecked} == stale1', then: 'selected')}><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.lastChecked.stale1" /></option>
+                    <option value="stale7" {f:if(condition: '{demand.lastChecked} == stale7', then: 'selected')}><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.lastChecked.stale7" /></option>
+                    <option value="stale30" {f:if(condition: '{demand.lastChecked} == stale30', then: 'selected')}><f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:filter.lastChecked.stale30" /></option>
                 </select>
             </div>
             <f:if condition="{showHitCounter}">

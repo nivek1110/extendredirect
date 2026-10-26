@@ -16,9 +16,18 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
     public const BROKEN_REDIRECT_ALL = 0;
 
     /**
+     * Values of the "last checked" filter: never checked at all, or not checked for 1/7/30 days
+     * (which includes the never checked ones).
+     */
+    public const LAST_CHECKED_NEVER = 'never';
+    public const LAST_CHECKED_OPTIONS = ['never', 'stale1', 'stale7', 'stale30'];
+
+    /**
      * @var int
      */
     protected $brokenRedirect = self::BROKEN_REDIRECT_ALL;
+
+    protected string $lastChecked = '';
 
     /**
      * TYPO3 14's core Demand takes a "redirectType" argument right after the order direction
@@ -38,8 +47,9 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
      * @param int|null $protected
      * @param string|null $integrityStatus
      * @param int $brokenRedirect
+     * @param string $lastChecked one of LAST_CHECKED_OPTIONS, anything else means no filter
      */
-    public function __construct(int $page = 1, string $orderField = self::DEFAULT_ORDER_FIELD, string $orderDirection = self::ORDER_ASCENDING, array $sourceHosts = [], string $sourcePath = '', string $target = '', array $statusCodes = [], int $maxHits = 0, ?\DateTimeInterface $olderThan = null, ?int $creationType = -1, ?int $protected = -1, ?string $integrityStatus = null, int $brokenRedirect = 0)
+    public function __construct(int $page = 1, string $orderField = self::DEFAULT_ORDER_FIELD, string $orderDirection = self::ORDER_ASCENDING, array $sourceHosts = [], string $sourcePath = '', string $target = '', array $statusCodes = [], int $maxHits = 0, ?\DateTimeInterface $olderThan = null, ?int $creationType = -1, ?int $protected = -1, ?string $integrityStatus = null, int $brokenRedirect = 0, string $lastChecked = '')
     {
         $coreOnlyArguments = (new Typo3Version())->getMajorVersion() >= 14 ? ['redirectType' => 'default'] : [];
 
@@ -59,6 +69,7 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
             integrityStatus: $integrityStatus
         );
         $this->brokenRedirect = $brokenRedirect;
+        $this->lastChecked = in_array($lastChecked, self::LAST_CHECKED_OPTIONS, true) ? $lastChecked : '';
     }
 
     /**
@@ -90,8 +101,9 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
         $target = $requestDemand['target'] ?? '';
         $maxHits = (int) ($requestDemand['max_hits'] ?? 0);
         $brokenRedirect = (int) ($requestDemand['broken_redirect'] ?? 0);
+        $lastChecked = (string) ($requestDemand['last_checked'] ?? '');
 
-        return new self($page, $orderField, $orderDirection, $sourceHosts, $sourcePath, $target, $statusCodes, $maxHits, null, -1, -1, null, $brokenRedirect);
+        return new self($page, $orderField, $orderDirection, $sourceHosts, $sourcePath, $target, $statusCodes, $maxHits, null, -1, -1, null, $brokenRedirect, $lastChecked);
     }
 
     /**
@@ -118,12 +130,22 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
         $this->brokenRedirect = $brokenRedirect;
     }
 
+    public function getLastChecked(): string
+    {
+        return $this->lastChecked;
+    }
+
+    public function hasLastChecked(): bool
+    {
+        return $this->lastChecked !== '';
+    }
+
     /**
      * @return bool
      */
     public function hasConstraints(): bool
     {
-        return parent::hasConstraints() || $this->hasBrokenRedirect();
+        return parent::hasConstraints() || $this->hasBrokenRedirect() || $this->hasLastChecked();
     }
 
     /**
@@ -149,6 +171,9 @@ class RedirectDemand extends \TYPO3\CMS\Redirects\Repository\Demand
         }
         if ($this->hasBrokenRedirect()) {
             $parameters['broken_redirect'] = $this->getBrokenRedirect();
+        }
+        if ($this->hasLastChecked()) {
+            $parameters['last_checked'] = $this->getLastChecked();
         }
         return $parameters;
     }

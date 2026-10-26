@@ -223,6 +223,34 @@
             <trans-unit id="mail.outro">
                 <source>Details are listed under "Disable log" in the Redirects module, where you can review and re-enable them.</source>
             </trans-unit>
+
+            <trans-unit id="table.lastChecked">
+                <source>Last checked</source>
+            </trans-unit>
+
+            <trans-unit id="table.lastChecked.never">
+                <source>never</source>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.label">
+                <source>Last check</source>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.never">
+                <source>Never checked</source>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale1">
+                <source>Not checked for 1 day</source>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale7">
+                <source>Not checked for 7 days</source>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale30">
+                <source>Not checked for 30 days</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

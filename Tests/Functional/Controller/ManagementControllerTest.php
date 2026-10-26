@@ -7,6 +7,7 @@ namespace Nivek1110\Extendredirect\Tests\Functional\Controller;
 use Nivek1110\Extendredirect\Controller\ManagementController;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
+use TYPO3\CMS\Backend\Module\ModuleData;
 use TYPO3\CMS\Backend\Module\ModuleProvider;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
@@ -157,6 +158,8 @@ class ManagementControllerTest extends FunctionalTestCase
 
         $request = (new ServerRequest('https://example.com/typo3/module/redirects', 'POST'))
             ->withAttribute('applicationType', SystemEnvironmentBuilder::REQUESTTYPE_BE)
+            // 14.x reads the redirect type from the module data; 13.4 ignores the attribute
+            ->withAttribute('moduleData', new ModuleData('redirects', ['redirectType' => 'default']))
             ->withAttribute('route', new Route('/module/redirects', ['packageName' => 'nivek1110/extendredirect']))
             ->withAttribute('module', $this->get(ModuleProvider::class)->getModule(
                 (new Typo3Version())->getMajorVersion() >= 14 ? 'redirects' : 'site_redirects',
@@ -221,5 +224,47 @@ class ManagementControllerTest extends FunctionalTestCase
         self::assertStringNotContainsString('/entry-25-end', $secondPage);
         // An out-of-range page falls back to the last one.
         self::assertStringContainsString('/entry-5-end', $beyondLast);
+    }
+
+    private function insertRedirect(string $sourcePath, int $lastChecked): void
+    {
+        $this->getConnectionPool()->getConnectionForTable('sys_redirect')->insert('sys_redirect', [
+            'pid' => 0,
+            'source_host' => '*',
+            'source_path' => $sourcePath,
+            'target' => '/target',
+            'target_statuscode' => 301,
+            'last_checked' => $lastChecked,
+        ]);
+    }
+
+    public function testOverviewShowsTheLastCheckedColumnAndFilter(): void
+    {
+        $this->insertRedirect('/never-checked-path', 0);
+        $this->insertRedirect('/checked-path', 1700049600);
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringContainsString('Last checked', $body);
+        self::assertStringContainsString('name="demand[last_checked]"', $body);
+        self::assertStringContainsString('/never-checked-path', $body);
+        self::assertStringContainsString('/checked-path', $body);
+        // never: shown as text; checked: formatted date of the timestamp 1700049600 (15.11.2023)
+        self::assertStringContainsString('15.11.2023', $body);
+    }
+
+    public function testOverviewFilterNarrowsTheListToNeverCheckedRedirects(): void
+    {
+        $this->insertRedirect('/never-checked-path', 0);
+        $this->insertRedirect('/checked-path', 1700049600);
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleRequest(
+            $this->createBackendRequest(['demand' => ['last_checked' => 'never']])
+        )->getBody();
+
+        self::assertStringContainsString('/never-checked-path', $body);
+        self::assertStringNotContainsString('/checked-path', $body);
     }
 }

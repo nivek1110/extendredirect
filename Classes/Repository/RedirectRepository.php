@@ -327,6 +327,25 @@ class RedirectRepository extends \TYPO3\CMS\Redirects\Repository\RedirectReposit
             );
         }
 
+        if ($demand->hasLastChecked()) {
+            if ($demand->getLastChecked() === RedirectDemand::LAST_CHECKED_NEVER) {
+                $constraints[] = $queryBuilder->expr()->eq(
+                    'last_checked',
+                    $queryBuilder->createNamedParameter(0, ParameterType::INTEGER)
+                );
+            } else {
+                // "staleN": not checked for N days - redirects that were never checked count as well
+                $days = (int) substr($demand->getLastChecked(), strlen('stale'));
+                $constraints[] = $queryBuilder->expr()->lt(
+                    'last_checked',
+                    $queryBuilder->createNamedParameter(
+                        (int) ($GLOBALS['EXEC_TIME'] ?? time()) - $days * 86400,
+                        ParameterType::INTEGER
+                    )
+                );
+            }
+        }
+
         if ($demand->hasBrokenRedirect()) {
             $constraints[] = $queryBuilder->expr()->in(
                 'broken_redirect',

@@ -332,4 +332,40 @@ class RedirectRepositoryTest extends FunctionalTestCase
         self::assertSame(['/a', '/b', '/c'], $this->sourcePaths($ascending));
         self::assertSame(['/c', '/b', '/a'], $this->sourcePaths($descending));
     }
+
+    public function testFindRedirectsByRbDemandFiltersNeverCheckedRedirects(): void
+    {
+        $this->insertRedirect(['source_path' => '/never', 'last_checked' => 0]);
+        $this->insertRedirect(['source_path' => '/checked', 'last_checked' => time() - 60]);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(lastChecked: 'never'));
+
+        self::assertSame(['/never'], $this->sourcePaths($result));
+    }
+
+    public function testFindRedirectsByRbDemandFiltersRedirectsNotCheckedForTheGivenDays(): void
+    {
+        $this->insertRedirect(['source_path' => '/never', 'last_checked' => 0]);
+        $this->insertRedirect(['source_path' => '/ten-days', 'last_checked' => time() - 10 * 86400]);
+        $this->insertRedirect(['source_path' => '/two-days', 'last_checked' => time() - 2 * 86400]);
+        $this->insertRedirect(['source_path' => '/fresh', 'last_checked' => time() - 3600]);
+
+        $sevenDays = $this->subject->findRedirectsByRbDemand(new RedirectDemand(lastChecked: 'stale7', orderField: 'source_path'));
+        $oneDay = $this->subject->findRedirectsByRbDemand(new RedirectDemand(lastChecked: 'stale1', orderField: 'source_path'));
+
+        // "not checked for N days" includes redirects that were never checked at all
+        self::assertSame(['/never', '/ten-days'], $this->sourcePaths($sevenDays));
+        self::assertSame(['/never', '/ten-days', '/two-days'], $this->sourcePaths($oneDay));
+    }
+
+    public function testLastCheckedFilterCombinesWithTheOtherFilters(): void
+    {
+        $this->insertRedirect(['source_path' => '/a-stale', 'target_statuscode' => 302, 'last_checked' => 0]);
+        $this->insertRedirect(['source_path' => '/b-stale-301', 'target_statuscode' => 301, 'last_checked' => 0]);
+        $this->insertRedirect(['source_path' => '/c-fresh-302', 'target_statuscode' => 302, 'last_checked' => time()]);
+
+        $result = $this->subject->findRedirectsByRbDemand(new RedirectDemand(statusCodes: [302], lastChecked: 'never'));
+
+        self::assertSame(['/a-stale'], $this->sourcePaths($result));
+    }
 }

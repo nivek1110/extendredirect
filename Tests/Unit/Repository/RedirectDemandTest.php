@@ -112,4 +112,35 @@ class RedirectDemandTest extends TestCase
         self::assertNotContains('redirectType', $parameterNames);
         self::assertContains('brokenRedirect', $parameterNames);
     }
+
+    public function testLastCheckedFilterIsReadFromTheRequestAndExposedAsParameter(): void
+    {
+        $request = (new ServerRequest())->withQueryParams(['demand' => ['last_checked' => 'stale7']]);
+
+        $demand = RedirectDemand::createFromRequest($request);
+
+        self::assertSame('stale7', $demand->getLastChecked());
+        self::assertTrue($demand->hasLastChecked());
+        self::assertTrue($demand->hasConstraints());
+        self::assertSame(['last_checked' => 'stale7'], $demand->getParameters());
+    }
+
+    public function testUnknownLastCheckedValuesAreIgnored(): void
+    {
+        $request = (new ServerRequest())->withQueryParams(['demand' => ['last_checked' => "stale7'; DROP TABLE x"]]);
+
+        $demand = RedirectDemand::createFromRequest($request);
+
+        self::assertSame('', $demand->getLastChecked());
+        self::assertFalse($demand->hasLastChecked());
+        self::assertSame([], $demand->getParameters());
+    }
+
+    public function testNoLastCheckedFilterByDefault(): void
+    {
+        $demand = new RedirectDemand();
+
+        self::assertSame('', $demand->getLastChecked());
+        self::assertFalse($demand->hasConstraints());
+    }
 }

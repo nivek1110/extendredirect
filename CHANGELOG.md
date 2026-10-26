@@ -5,6 +5,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Redirects module: a "Last checked" column and a "Last check" filter (never checked, not checked for 1, 7 or 30
+  days), so you can see whether the Scheduler actually runs.
+
 ## [1.1.2] - 2026-10-26
 
 ### Changed

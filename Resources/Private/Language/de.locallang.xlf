@@ -310,6 +310,41 @@
                 <source>Details are listed under "Disable log" in the Redirects module, where you can review and re-enable them.</source>
                 <target>Details stehen im Redirects-Modul unter "Disable log". Dort können die Redirects geprüft und wieder aktiviert werden.</target>
             </trans-unit>
+
+            <trans-unit id="table.lastChecked">
+                <source>Last checked</source>
+                <target>Zuletzt geprüft</target>
+            </trans-unit>
+
+            <trans-unit id="table.lastChecked.never">
+                <source>never</source>
+                <target>nie</target>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.label">
+                <source>Last check</source>
+                <target>Letzte Prüfung</target>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.never">
+                <source>Never checked</source>
+                <target>Nie geprüft</target>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale1">
+                <source>Not checked for 1 day</source>
+                <target>Seit 1 Tag nicht geprüft</target>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale7">
+                <source>Not checked for 7 days</source>
+                <target>Seit 7 Tagen nicht geprüft</target>
+            </trans-unit>
+
+            <trans-unit id="filter.lastChecked.stale30">
+                <source>Not checked for 30 days</source>
+                <target>Seit 30 Tagen nicht geprüft</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>
