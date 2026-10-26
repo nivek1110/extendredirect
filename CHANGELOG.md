@@ -23,6 +23,12 @@ All notable changes to this project are documented here. The format follows
   (`text` for Slack/Mattermost/Rocket.Chat, or structured `json`) post the same notification as the mail, with
   the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
 
+### Fixed
+- `request` check mode: a disabled (auto-disabled) redirect could never heal. The core ignores disabled redirects, so
+  its source URL always answered 404 and the check stayed "broken" even after the target was fixed - in the bulk run,
+  with "Check now" and with the new "Apply". Disabled redirects are now checked via their target (page link,
+  same-site path); a target on another host is left alone, as in `database` mode.
+
 ### Changed
 - `DisableNotificationService` gets the PSR-14 event dispatcher as a fourth constructor argument (only relevant
   if you instantiate it yourself).

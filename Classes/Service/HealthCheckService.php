@@ -413,7 +413,62 @@ class HealthCheckService
             return $this->checkRegexRedirectTarget($redirect);
         }
 
-        $urls = $this->resolveUrls($redirect);
+        // The core ignores a disabled redirect, so its source URL 404s no matter how healthy the target is -
+        // the only way such a redirect can ever heal is to look at where it points.
+        if ((int) ($redirect['disabled'] ?? 0) === 1) {
+            return $this->checkDisabledRedirectViaTarget($redirect);
+        }
+
+        return $this->checkSourceUrls($redirect, (string) ($redirect['source_path'] ?? ''));
+    }
+
+    /**
+     * "request" mode for a disabled redirect: requests the target instead of the source. A page link
+     * must still resolve to a visible page, a target on another host is left alone (as in "database" mode).
+     *
+     * @param array<mixed> $redirect
+     * @return array<mixed>
+     */
+    protected function checkDisabledRedirectViaTarget(array &$redirect): array
+    {
+        $target = (string) ($redirect['target'] ?? '');
+
+        if (str_starts_with($target, 't3://')) {
+            try {
+                $link = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
+            } catch (\Throwable) {
+                return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
+            }
+            if (($link['type'] ?? '') !== LinkService::TYPE_PAGE) {
+                return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
+            }
+            $page = $this->findPageByUid((int) ($link['pageuid'] ?? 0));
+            if ($page === null) {
+                return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
+            }
+            $path = (string) $page['slug'];
+        } elseif (preg_match('#^(https?:)?//#i', $target) === 1) {
+            $host = (string) parse_url($target, PHP_URL_HOST);
+            if ($this->findSiteByHost($host) === null) {
+                return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
+            }
+            $path = (string) parse_url($target, PHP_URL_PATH);
+        } else {
+            $path = (string) parse_url($target, PHP_URL_PATH);
+        }
+
+        return $this->checkSourceUrls($redirect, '/' . ltrim($path, '/'));
+    }
+
+    /**
+     * Requests $path on the site(s) the redirect's source host stands for and evaluates the answer.
+     *
+     * @param array<mixed> $redirect
+     * @return array<mixed>
+     */
+    protected function checkSourceUrls(array &$redirect, string $path): array
+    {
+        $urls = $this->resolveUrls(['source_host' => $redirect['source_host'], 'source_path' => $path]);
 
         if ($urls === []) {
             $statusCode = 500;

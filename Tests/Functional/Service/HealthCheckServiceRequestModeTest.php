@@ -327,4 +327,57 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame($originalRequest, $GLOBALS['TYPO3_REQUEST']);
         self::assertTrue($context->getAspect('backend.user')->isLoggedIn());
     }
+
+    public function testADisabledBrokenRedirectIsCheckedViaItsTargetAndHealedOnceItExists(): void
+    {
+        $pageUid = $this->insertPage($this->rootUid, '/new');
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://example.com/new' => $this->responseWithStatus(200)]);
+
+        $result = $service->recheck($uid);
+
+        // The core ignores disabled redirects, so the source URL would 404 forever: the target is what counts.
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame(['https://example.com/new'], $this->requestedUrls->getArrayCopy());
+        $row = $this->redirects->findByUid($uid);
+        self::assertIsArray($row);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame(0, (int) $row['broken_redirect']);
+    }
+
+    public function testADisabledBrokenRedirectWhoseTargetPathStill404sStaysDisabled(): void
+    {
+        $uid = $this->insertRedirect('/old', '/missing', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService([]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame(['https://example.com/missing'], $this->requestedUrls->getArrayCopy());
+        $row = $this->redirects->findByUid($uid);
+        self::assertIsArray($row);
+        self::assertSame(1, (int) $row['disabled']);
+    }
+
+    public function testADisabledBrokenRedirectToADeletedPageStaysDisabledWithoutARequest(): void
+    {
+        $uid = $this->insertRedirect('/old', 't3://page?uid=9999', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService([]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledBrokenRedirectToAnExternalSiteIsLeftAloneAndHealed(): void
+    {
+        $uid = $this->insertRedirect('/old', 'https://other.example/page', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService([]);
+
+        $result = $service->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy());
+    }
 }
