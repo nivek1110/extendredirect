@@ -443,11 +443,25 @@ class HealthCheckService
     {
         try {
             $defaultLanguagePageId = (int) ($page['l10n_parent'] ?? 0) > 0 ? (int) $page['l10n_parent'] : (int) $page['uid'];
-            if ($languageId !== null && $languageId > 0 && (int) ($page['sys_language_uid'] ?? 0) === 0 && !$this->translationExists($defaultLanguagePageId, $languageId)) {
+            $site = $this->siteFinder->getSiteByPageId($defaultLanguagePageId);
+            // sys_language_uid: >0 a translation, 0 the default language, -1 a page that exists in every language
+            $rowLanguageId = (int) ($page['sys_language_uid'] ?? 0);
+            $isTranslation = $rowLanguageId > 0;
+            $language = $site->getLanguageById($isTranslation ? $rowLanguageId : ($languageId ?? 0));
+            if (!$language->isEnabled()) {
+                // A disabled language has no frontend.
                 return null;
             }
-            $site = $this->siteFinder->getSiteByPageId($defaultLanguagePageId);
-            $language = $site->getLanguageById($languageId !== null && (int) ($page['sys_language_uid'] ?? 0) === 0 ? $languageId : (int) ($page['sys_language_uid'] ?? 0));
+            // A default language page "in another language" needs a translation - unless that language falls back
+            // to the default language (fallbackType "fallback"), where the URL shows the default language content.
+            // Pages for all languages (-1) are available in every language.
+            // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+            $targetLanguageId = $language->getLanguageId();
+            if ($targetLanguageId > 0 && $rowLanguageId === 0
+                && $language->getFallbackType() !== 'fallback'
+                && !$this->translationExists($defaultLanguagePageId, $targetLanguageId)) {
+                return null;
+            }
 
             return (string) $site->getRouter()->generateUri($defaultLanguagePageId, ['_language' => $language]);
         } catch (\Throwable) {

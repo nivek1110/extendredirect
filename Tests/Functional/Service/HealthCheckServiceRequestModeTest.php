@@ -397,8 +397,9 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
     /**
      * @param array<string, mixed> $languageOverrides
+     * @param array<string, mixed> $germanOverrides
      */
-    private function createSecondSite(string $identifier, string $base, array $languageOverrides = [], bool $withGerman = false, string $germanBase = '/de/'): int
+    private function createSecondSite(string $identifier, string $base, array $languageOverrides = [], bool $withGerman = false, string $germanBase = '/de/', array $germanOverrides = []): int
     {
         $rootUid = $this->insertPage(0, '/', true);
         $writer = GeneralUtility::makeInstance(SiteWriter::class);
@@ -406,10 +407,10 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         $configuration = GeneralUtility::makeInstance(SiteFinder::class)->getSiteByIdentifier($identifier)->getConfiguration();
         $configuration['languages'][0] = array_merge($configuration['languages'][0], $languageOverrides);
         if ($withGerman) {
-            $configuration['languages'][] = [
+            $configuration['languages'][] = array_merge([
                 'languageId' => 1, 'title' => 'Deutsch', 'navigationTitle' => 'Deutsch',
                 'locale' => 'de_DE.UTF-8', 'base' => $germanBase, 'enabled' => true, 'flag' => 'de',
-            ];
+            ], $germanOverrides);
         }
         $writer->write($identifier, $configuration);
 
@@ -576,5 +577,77 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertContains('https://example.com/old', $requested);
         self::assertContains('https://other.example/old', $requested);
         self::assertContains('https://de.other.example/old', $requested, 'the wildcard also applies on the domain of a language');
+    }
+
+    public function testADisabledRedirectToAHiddenTranslationStaysBroken(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $german = $this->insertPageInSite($otherRoot, '/neu', 1, $english);
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['hidden' => 1], ['uid' => $german]);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
+
+        self::assertSame('broken', $this->check($service, $uid)['status']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledRedirectToADisabledLanguageStaysBroken(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['enabled' => false]);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $this->insertPageInSite($otherRoot, '/neu', 1, $english);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/neu' => $this->responseWithStatus(200)]);
+
+        self::assertSame('broken', $this->check($service, $uid)['status']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy(), 'a disabled language has no frontend');
+    }
+
+    public function testAMissingTranslationIsFineWhenTheLanguageFallsBackToTheDefaultLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true, '/de/', ['fallbackType' => 'fallback', 'fallbackChain' => [0]]);
+        $english = $this->insertPageInSite($otherRoot, '/new');
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/new' => $this->responseWithStatus(200)]);
+
+        self::assertSame('healthy', $this->check($service, $uid)['status']);
+        self::assertSame(['https://other.example/de/new'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testAMissingTranslationIsBrokenInStrictAndFreeLanguageModes(): void
+    {
+        foreach (['strict', 'free'] as $mode) {
+            $this->requestedUrls->exchangeArray([]);
+            $otherRoot = $this->createSecondSite('other-' . $mode, 'https://' . $mode . '.example/', [], true, '/de/', ['fallbackType' => $mode]);
+            $english = $this->insertPageInSite($otherRoot, '/new');
+            $uid = $this->insertRedirect('/old-' . $mode, 't3://page?uid=' . $english . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+            $service = $this->createService([]);
+
+            self::assertSame('broken', $this->check($service, $uid)['status'], $mode);
+            self::assertSame([], array_filter($this->requestedUrls->getArrayCopy(), static fn(string $url): bool => str_contains($url, '/de/')), $mode);
+        }
+    }
+
+    public function testADisabledRedirectToAPageForAllLanguagesIsRequestedInTheDefaultLanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $pageUid = $this->insertPageInSite($otherRoot, '/impressum', -1);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid, ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/impressum' => $this->responseWithStatus(200)]);
+
+        self::assertSame('healthy', $this->check($service, $uid)['status']);
+        self::assertSame(['https://other.example/impressum'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledRedirectToAPageForAllLanguagesCanNameALanguage(): void
+    {
+        $otherRoot = $this->createSecondSite('other', 'https://other.example/', [], true);
+        $pageUid = $this->insertPageInSite($otherRoot, '/impressum', -1);
+        $uid = $this->insertRedirect('/old', 't3://page?uid=' . $pageUid . '&_language=1', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService(['https://other.example/de/impressum' => $this->responseWithStatus(200)]);
+
+        self::assertSame('healthy', $this->check($service, $uid)['status']);
+        self::assertSame(['https://other.example/de/impressum'], $this->requestedUrls->getArrayCopy());
     }
 }

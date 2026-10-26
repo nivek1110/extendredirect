@@ -67,10 +67,14 @@ class RedirectRepository extends \TYPO3\CMS\Redirects\Repository\RedirectReposit
     {
         $queryBuilder = $this->getQueryBuilder();
 
+        // The page link itself, also with parameters ("&_language=1") or an anchor ("#c12") behind it.
         $conditions = [
             $queryBuilder->expr()->eq('target', $queryBuilder->createNamedParameter($t3Link)),
+            $queryBuilder->expr()->like('target', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($t3Link) . '&%')),
+            $queryBuilder->expr()->like('target', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards($t3Link) . '#%')),
         ];
-        if ($slug !== null && $slug !== '') {
+        // The root slug "/" ends nearly every path: only the page link can tell a redirect to the root page.
+        if ($slug !== null && $slug !== '' && trim($slug, '/') !== '') {
             $conditions[] = $queryBuilder->expr()->like(
                 'target',
                 $queryBuilder->createNamedParameter('%' . $queryBuilder->escapeLikeWildcards($slug))

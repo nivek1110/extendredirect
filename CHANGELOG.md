@@ -19,6 +19,16 @@ All notable changes to this project are documented here. The format follows
   the same digest/single rhythm. It is switched by `notifyOnDisable`; failures are logged and never fatal.
 
 ### Fixed
+- Page delete/hide protection: a path target now only counts as pointing at the page if it is the page's URL - the
+  slug behind the base path of the page's language, on a host of that site or language. Before, any target that merely
+  ended with the slug was disabled: the same path on another site, a default language redirect when only its
+  translation was hidden, and (for the root page `/`) nearly every redirect with a trailing slash. A page link with
+  parameters (`t3://page?uid=5&_language=1`) is recognised too, pages for all languages (`-1`) match in every
+  language, and hiding a default language page also covers redirects to its translations. Redirects to the root page
+  by path (`/`) are no longer found by the path; those by page link still are.
+- `request` check mode, languages: a page link into a disabled language is broken, a missing translation is broken
+  unless the language falls back to the default language (`fallbackType: fallback`), and a page for all languages
+  (`-1`) is requested in the default language or the one named by `&_language=`.
 - Language domains: a language with a domain of its own (for example `de.example.com`) is now a known host. Before,
   only site bases were: a redirect with such a source host was disabled as "unknown source host", and the CSV import
   rejected it. The check requests the redirect on that domain, a `*` redirect is checked on every domain including the
