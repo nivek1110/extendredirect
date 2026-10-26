@@ -5,6 +5,7 @@ namespace Nivek1110\Extendredirect\Controller;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
+use Nivek1110\Extendredirect\Service\HealthCheckService;
 use Nivek1110\Extendredirect\Service\RedirectCsvExportService;
 use Nivek1110\Extendredirect\Service\RedirectCsvImportService;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
@@ -133,6 +134,42 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
 
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
         return new RedirectResponse((string) $uriBuilder->buildUriFromRoute('redirect_disable_log'));
+    }
+
+    /**
+     * Re-checks one redirect from the disable log (?redirectUid=<uid>) and returns to the log.
+     */
+    public function recheckAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $languageService = $this->getLanguageService();
+        $label = static fn(string $key): string => $languageService->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:' . $key);
+
+        $result = GeneralUtility::makeInstance(HealthCheckService::class)
+            ->recheck((int) ($request->getQueryParams()['redirectUid'] ?? 0));
+
+        match ($result['status']) {
+            HealthCheckService::RECHECK_HEALTHY => $this->addFlashMessage(
+                $label('flashMessage.recheck.healthy.message'),
+                $label('flashMessage.recheck.title')
+            ),
+            HealthCheckService::RECHECK_BROKEN => $this->addFlashMessage(
+                sprintf($label('flashMessage.recheck.broken.message'), $result['message']),
+                $label('flashMessage.recheck.title'),
+                ContextualFeedbackSeverity::WARNING
+            ),
+            HealthCheckService::RECHECK_MANUALLY_DISABLED => $this->addFlashMessage(
+                $label('flashMessage.recheck.manuallyDisabled.message'),
+                $label('flashMessage.recheck.title'),
+                ContextualFeedbackSeverity::INFO
+            ),
+            default => $this->addFlashMessage(
+                $label('flashMessage.recheck.notFound.message'),
+                $label('flashMessage.recheck.title'),
+                ContextualFeedbackSeverity::ERROR
+            ),
+        };
+
+        return new RedirectResponse((string) GeneralUtility::makeInstance(UriBuilder::class)->buildUriFromRoute('redirect_disable_log'));
     }
 
     protected function importRedirect(string $uploadedFile, ModuleTemplate $view): void

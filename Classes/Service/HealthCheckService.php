@@ -38,6 +38,11 @@ class HealthCheckService
 
     private const MAX_CHAIN_HOPS = 10;
 
+    public const RECHECK_NOT_FOUND = 'notFound';
+    public const RECHECK_MANUALLY_DISABLED = 'manuallyDisabled';
+    public const RECHECK_HEALTHY = 'healthy';
+    public const RECHECK_BROKEN = 'broken';
+
     /**
      * Context aspects the frontend sub-request may overwrite and that the surrounding
      * (backend) request must get back unchanged - see redirectFollower().
@@ -72,6 +77,35 @@ class HealthCheckService
         $this->runBulkCheck();
 
         return null;
+    }
+
+    /**
+     * Re-checks a single redirect on demand (the "Check now" button of the disable log).
+     *
+     * A healthy one is enabled again, a broken one stays (or becomes) disabled. A redirect an editor
+     * disabled by hand is never touched, same as in a bulk run.
+     *
+     * @return array{status: string, message: string}
+     * @throws Exception
+     */
+    public function recheck(int $uid): array
+    {
+        $redirect = GeneralUtility::makeInstance(RedirectRepository::class)->findByUid($uid);
+        if (!is_array($redirect)) {
+            return ['status' => self::RECHECK_NOT_FOUND, 'message' => ''];
+        }
+        if ((int) $redirect['disabled'] === 1 && (int) ($redirect['broken_redirect'] ?? 0) === 0) {
+            return ['status' => self::RECHECK_MANUALLY_DISABLED, 'message' => ''];
+        }
+
+        $check = $this->checkRedirect($redirect);
+        $this->updateRedirect($redirect, $check);
+        GeneralUtility::makeInstance(DisableNotificationService::class)->flush();
+
+        return [
+            'status' => $check['redirectError'] ? self::RECHECK_BROKEN : self::RECHECK_HEALTHY,
+            'message' => (string) ($check['message'] ?? ''),
+        ];
     }
 
     /**

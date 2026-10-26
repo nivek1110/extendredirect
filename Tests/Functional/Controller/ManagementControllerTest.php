@@ -18,6 +18,7 @@ use TYPO3\CMS\Core\Information\Typo3Version;
 use PHPUnit\Framework\MockObject\Generator\ClassIsFinalException;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -292,5 +293,70 @@ class ManagementControllerTest extends FunctionalTestCase
 
         self::assertStringContainsString('Export redirects', $body);
         self::assertStringContainsString('redirect_export', $body);
+    }
+
+    private function insertBrokenRedirect(string $target): int
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('sys_redirect');
+        $connection->insert('sys_redirect', [
+            'pid' => 0,
+            'source_host' => '*',
+            'source_path' => '/was-broken',
+            'target' => $target,
+            'target_statuscode' => 301,
+            'disabled' => 1,
+            'broken_redirect' => 1,
+        ]);
+
+        return (int) $connection->lastInsertId();
+    }
+
+    /**
+     * @return list<string> bodies of the flash messages queued so far
+     */
+    private function flashMessageBodies(): array
+    {
+        $queue = GeneralUtility::makeInstance(FlashMessageService::class)->getMessageQueueByIdentifier();
+
+        return array_values(array_map(static fn($message): string => $message->getMessage(), $queue->getAllMessages()));
+    }
+
+    public function testRecheckActionReenablesAHealedRedirectAndReturnsToTheLog(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkMode'] = 'database';
+        $uid = $this->insertBrokenRedirect('https://example.org/healthy');
+        $controller = $this->get(ManagementController::class);
+
+        $response = $controller->recheckAction($this->createBackendRequest(['redirectUid' => (string) $uid]));
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertStringContainsString('redirect_disable_log', $response->getHeaderLine('Location'));
+        $row = GeneralUtility::makeInstance(RedirectRepository::class)->findByUid($uid);
+        self::assertIsArray($row);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame(0, (int) $row['broken_redirect']);
+        self::assertNotSame([], $this->flashMessageBodies());
+    }
+
+    public function testRecheckActionLeavesAMissingRedirectAloneAndStillReturnsToTheLog(): void
+    {
+        $controller = $this->get(ManagementController::class);
+
+        $response = $controller->recheckAction($this->createBackendRequest(['redirectUid' => '9999']));
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertNotSame([], $this->flashMessageBodies());
+    }
+
+    public function testTheLogOffersARecheckButtonPerEntry(): void
+    {
+        $this->logRepository->add($this->logEntry(42));
+        $controller = $this->get(ManagementController::class);
+
+        $body = (string) $controller->handleLogRequest($this->createBackendRequest())->getBody();
+
+        self::assertStringContainsString('redirect_recheck', $body);
+        self::assertStringContainsString('redirectUid=42', $body);
+        self::assertStringContainsString('Check now', $body);
     }
 }

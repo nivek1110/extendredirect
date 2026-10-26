@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
   days), so you can see whether the Scheduler actually runs.
 - Redirects module: an "Export redirects" button downloads all redirects as CSV in the import format, so an export
   can be edited and imported again. The CSV import accepts the optional columns `is_regexp` and `disabled` too.
+- Disable log: a "Check now" button per entry re-checks that redirect on demand. A healthy one is enabled again,
+  a broken one stays disabled; redirects disabled by hand are never touched.
 
 ## [1.1.2] - 2026-10-26
 

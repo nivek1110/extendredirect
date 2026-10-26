@@ -320,6 +320,62 @@ class HealthCheckServiceTest extends FunctionalTestCase
         self::assertSame([['uid' => $uid, 'newlyDisabled' => true]], $this->uidsAndFlag($result['broken']));
     }
 
+    public function testRecheckReenablesABrokenRedirectOnceItsTargetExists(): void
+    {
+        $uid = $this->insertRedirect('/old', '/later');
+        $this->subject->runBulkCheck();
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+        $this->insertPage('/later');
+
+        $result = $this->subject->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_HEALTHY, $result['status']);
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame(0, (int) $row['broken_redirect']);
+    }
+
+    public function testRecheckKeepsAStillBrokenRedirectDisabledWithoutLoggingAgain(): void
+    {
+        $uid = $this->insertRedirect('/old', '/missing');
+        $this->subject->runBulkCheck();
+        $logged = GeneralUtility::makeInstance(DisableLogRepository::class)->countAll();
+
+        $result = $this->subject->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertNotSame('', $result['message']);
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+        self::assertSame($logged, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
+    }
+
+    public function testRecheckRefusesARedirectThatWasDisabledByHand(): void
+    {
+        $this->insertPage('/new');
+        $uid = $this->insertRedirect('/old', '/new', ['disabled' => 1]);
+
+        $result = $this->subject->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_MANUALLY_DISABLED, $result['status']);
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testRecheckReportsAnUnknownRedirect(): void
+    {
+        self::assertSame(HealthCheckService::RECHECK_NOT_FOUND, $this->subject->recheck(9999)['status']);
+    }
+
+    public function testRecheckDisablesAndLogsAnEnabledRedirectThatBrokeMeanwhile(): void
+    {
+        $uid = $this->insertRedirect('/old', '/missing');
+
+        $result = $this->subject->recheck($uid);
+
+        self::assertSame(HealthCheckService::RECHECK_BROKEN, $result['status']);
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+        self::assertSame(1, GeneralUtility::makeInstance(DisableLogRepository::class)->countAll());
+    }
+
     /**
      * @param list<array{uid: int, source: string, message: string, newlyDisabled: bool}> $broken
      * @return list<array{uid: int, newlyDisabled: bool}>

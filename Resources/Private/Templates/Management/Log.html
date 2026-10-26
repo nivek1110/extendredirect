@@ -43,7 +43,12 @@
                                 <td>{log.target -> f:format.crop(maxCharacters: 100)}</td>
                                 <td>{log.status_code}</td>
                                 <td>{log.reason}</td>
-                                <td>
+                                <td class="text-nowrap">
+                                    <a class="btn btn-default btn-sm"
+                                       href="{f:be.uri(route: 'redirect_recheck', parameters: '{redirectUid: log.redirect_uid}')}"
+                                       title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.title')}">
+                                        <core:icon identifier="actions-refresh" /> <f:translate key="LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.recheck.button" />
+                                    </a>
                                     <a class="btn btn-default btn-sm t3js-modal-trigger"
                                        href="{f:be.uri(route: 'redirect_disable_log_delete', parameters: '{logUid: log.uid}')}"
                                        title="{f:translate(key: 'LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:log.delete.title')}"

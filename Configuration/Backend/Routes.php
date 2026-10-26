@@ -18,6 +18,10 @@ return [
         'path' => '/redirect_disable_log',
         'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::handleLogRequest',
     ],
+    'redirect_recheck' => [
+        'path' => '/redirect_recheck',
+        'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::recheckAction',
+    ],
     'redirect_disable_log_delete' => [
         'path' => '/redirect_disable_log_delete',
         'target' => \Nivek1110\Extendredirect\Controller\ManagementController::class . '::deleteLogAction',

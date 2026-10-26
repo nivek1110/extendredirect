@@ -255,6 +255,27 @@
             <trans-unit id="button.export">
                 <source>Export redirects</source>
             </trans-unit>
+            <trans-unit id="flashMessage.recheck.title">
+                <source>Check now</source>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.healthy.message">
+                <source>The redirect is healthy and enabled again.</source>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.broken.message">
+                <source>The redirect is still broken and stays disabled: %s</source>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.manuallyDisabled.message">
+                <source>This redirect was disabled by hand and is not touched.</source>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.notFound.message">
+                <source>The redirect does not exist (anymore).</source>
+            </trans-unit>
+            <trans-unit id="log.recheck.button">
+                <source>Check now</source>
+            </trans-unit>
+            <trans-unit id="log.recheck.title">
+                <source>Check this redirect again and enable it if it is healthy</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

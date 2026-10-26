@@ -350,6 +350,34 @@
                 <source>Export redirects</source>
                 <target>Redirects exportieren</target>
             </trans-unit>
+            <trans-unit id="flashMessage.recheck.title">
+                <source>Check now</source>
+                <target>Jetzt prüfen</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.healthy.message">
+                <source>The redirect is healthy and enabled again.</source>
+                <target>Der Redirect ist in Ordnung und wieder aktiviert.</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.broken.message">
+                <source>The redirect is still broken and stays disabled: %s</source>
+                <target>Der Redirect ist weiterhin defekt und bleibt deaktiviert: %s</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.manuallyDisabled.message">
+                <source>This redirect was disabled by hand and is not touched.</source>
+                <target>Dieser Redirect wurde manuell deaktiviert und wird nicht verändert.</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.recheck.notFound.message">
+                <source>The redirect does not exist (anymore).</source>
+                <target>Der Redirect existiert (nicht mehr).</target>
+            </trans-unit>
+            <trans-unit id="log.recheck.button">
+                <source>Check now</source>
+                <target>Jetzt prüfen</target>
+            </trans-unit>
+            <trans-unit id="log.recheck.title">
+                <source>Check this redirect again and enable it if it is healthy</source>
+                <target>Diesen Redirect erneut prüfen und aktivieren, wenn er in Ordnung ist</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>
