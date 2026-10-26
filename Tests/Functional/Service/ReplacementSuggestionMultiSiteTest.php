@@ -160,4 +160,37 @@ class ReplacementSuggestionMultiSiteTest extends FunctionalTestCase
 
         self::assertSame([], $this->uids($this->insertBrokenRedirect('nowhere.example', '/produkte/schuhe-neu')));
     }
+
+    public function testADeletedTranslationIsMatchedInItsOwnLanguage(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/', '/de/');
+        $english = $this->insertPage($root, '/produkte/schuhe');
+        $deletedGerman = $this->insertPage($root, '/produkte/schuhe', ['sys_language_uid' => 1, 'l10n_parent' => $english, 'deleted' => 1]);
+        $germanNew = $this->insertPage($root, '/produkte/schuhe-neu', ['sys_language_uid' => 1]);
+
+        $uids = $this->uids($this->insertBrokenRedirect('example.com', 't3://page?uid=' . $deletedGerman));
+
+        self::assertSame([$germanNew], $uids, 'German pages only, and not the deleted one');
+    }
+
+    public function testALanguageParameterOnTheLinkSelectsTheLanguageOfTheSuggestions(): void
+    {
+        $root = $this->createSite('a', 'https://example.com/', '/de/');
+        $deleted = $this->insertPage($root, '/produkte/schuhe', ['deleted' => 1]);
+        $this->insertPage($root, '/produkte/schuhe-neu');
+        $german = $this->insertPage($root, '/produkte/schuhe-neu', ['sys_language_uid' => 1]);
+
+        self::assertSame([$german], $this->uids($this->insertBrokenRedirect('example.com', 't3://page?uid=' . $deleted . '&_language=1')));
+    }
+
+    public function testSuggestionsForAPageLinkStayInsideTheSiteOfTheSourceHost(): void
+    {
+        $rootA = $this->createSite('a', 'https://example.com/');
+        $rootB = $this->createSite('b', 'https://other.example/');
+        $deleted = $this->insertPage($rootA, '/produkte/schuhe', ['deleted' => 1]);
+        $pageA = $this->insertPage($rootA, '/produkte/schuhe-neu');
+        $this->insertPage($rootB, '/produkte/schuhe-neu');
+
+        self::assertSame([$pageA], $this->uids($this->insertBrokenRedirect('example.com', 't3://page?uid=' . $deleted)));
+    }
 }

@@ -19,7 +19,10 @@ All notable changes to this project are documented here. The format follows
   and re-checks the redirect, which enables it again if healthy. Redirects disabled by hand get no suggestion.
   With several sites or languages the suggestions stay inside the site(s) of the redirect's source host (every site
   for `*`, with the host shown) and inside the language of the target: a language prefix such as `/en/`, or a language
-  with a domain of its own, selects the translated pages, otherwise the default language is used.
+  with a domain of its own, selects the translated pages, otherwise the default language is used. A redirect whose
+  target is a page link (typical after the page delete/hide protection disabled it) is matched by the former slug and
+  language of that page, which is looked up even if the page is deleted or hidden; that page itself is never
+  suggested. If the page is gone for good (recycler emptied) there is nothing to compare and no suggestion.
 - PSR-14 event `Nivek1110\Extendredirect\Event\RedirectDisabledEvent`, dispatched for every redirect the health check
   or the page delete/hide guard disables, so your own code can react to it.
 - Optional webhook for disabled redirects: the extension settings `notifyWebhookUrl` and `notifyWebhookFormat`

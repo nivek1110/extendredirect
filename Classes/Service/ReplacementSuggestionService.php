@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Nivek1110\Extendredirect\Service;
 
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
+use Doctrine\DBAL\ParameterType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\LinkHandling\LinkService;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -110,13 +112,29 @@ class ReplacementSuggestionService
      */
     private function suggestFor(string $sourceHost, string $target, array $pages): array
     {
+        // A page link has no path of its own: its page (deleted or hidden, that is why the redirect is broken)
+        // tells what the redirect was looking for. That page is only the search key, it is never suggested.
+        $pageTarget = null;
+        if (str_starts_with($target, 't3://')) {
+            $pageTarget = $this->resolvePageLinkTarget($target);
+            if ($pageTarget === null) {
+                return [];
+            }
+        }
+
         $scopes = $this->findScopes($sourceHost);
         $showHost = count($this->siteFinder->getAllSites()) > 1;
         $siteRootIds = array_values(array_map(static fn(Site $site): int => $site->getRootPageId(), $this->siteFinder->getAllSites()));
 
         $best = [];
         foreach ($scopes as $scope) {
-            [$languageId, $path] = $this->resolveLanguage($scope['site'], $scope['language'], $target);
+            if ($pageTarget !== null) {
+                // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+                $languageId = $pageTarget['language'] ?? $scope['language']?->getLanguageId() ?? $scope['site']->getDefaultLanguage()->getLanguageId();
+                $path = $pageTarget['slug'];
+            } else {
+                [$languageId, $path] = $this->resolveLanguage($scope['site'], $scope['language'], $target);
+            }
             $rootId = $scope['site']->getRootPageId();
 
             $candidates = [];
@@ -143,6 +161,45 @@ class ReplacementSuggestionService
         usort($suggestions, static fn(array $a, array $b): int => [$b['score'], strlen($a['slug'])] <=> [$a['score'], strlen($b['slug'])]);
 
         return array_slice($suggestions, 0, self::MAX_SUGGESTIONS);
+    }
+
+    /**
+     * The slug and language of the page a page link points at, even if it is deleted or hidden. Null if the
+     * link is no page link or its page is gone for good (hard-deleted): then there is nothing to compare.
+     *
+     * @return array{slug: string, language: ?int}|null
+     */
+    private function resolvePageLinkTarget(string $target): ?array
+    {
+        try {
+            $link = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (($link['type'] ?? '') !== LinkService::TYPE_PAGE) {
+            return null;
+        }
+
+        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+        $queryBuilder->getRestrictions()->removeAll();
+        $row = $queryBuilder
+            ->select('slug', 'sys_language_uid')
+            ->from('pages')
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter((int) ($link['pageuid'] ?? 0), ParameterType::INTEGER)))
+            ->executeQuery()
+            ->fetchAssociative();
+        if ($row === false || (string) $row['slug'] === '') {
+            return null;
+        }
+
+        // A translation row knows its language; for a default language page "&_language=1" (or "&L=1") says it.
+        parse_str((string) parse_url($target, PHP_URL_QUERY), $parameters);
+        $parameter = $parameters['_language'] ?? $parameters['L'] ?? null;
+        $language = (int) $row['sys_language_uid'] > 0
+            ? (int) $row['sys_language_uid']
+            : (is_numeric($parameter) ? (int) $parameter : null);
+
+        return ['slug' => (string) $row['slug'], 'language' => $language];
     }
 
     /**
@@ -180,6 +237,7 @@ class ReplacementSuggestionService
     {
         if ($hostLanguage !== null) {
             // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+            // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
             return [$hostLanguage->getLanguageId(), $target];
         }
 
@@ -192,10 +250,12 @@ class ReplacementSuggestionService
             $prefix = '/' . trim(substr(rtrim($language->getBase()->getPath(), '/'), strlen($sitePath)), '/');
             if ($prefix !== '/' && ($path === $prefix || str_starts_with($path, $prefix . '/'))) {
                 // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
+                // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
                 return [$language->getLanguageId(), substr($path, strlen($prefix)) ?: '/'];
             }
         }
 
+        // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
         // @extensionScannerIgnoreLine SiteLanguage::getLanguageId(), not the removed TypoScriptFrontendController API
         return [$site->getDefaultLanguage()->getLanguageId(), $target];
     }

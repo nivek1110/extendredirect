@@ -122,4 +122,49 @@ class ReplacementSuggestionServiceTest extends FunctionalTestCase
 
         self::assertSame([], $this->subject->suggestForLogEntries([$entry]));
     }
+
+    /**
+     * @return list<array<string, mixed>> the suggestions of a redirect with the given target
+     */
+    private function suggestionsForTarget(string $target): array
+    {
+        $entry = $this->logFor($this->insertRedirect($target, 1, 1));
+
+        return $this->subject->suggestForLogEntries([$entry])[(int) $entry['uid']] ?? [];
+    }
+
+    public function testAPageLinkToADeletedPageIsMatchedByItsFormerSlugAndTheDeletedPageIsNeverSuggested(): void
+    {
+        $deleted = $this->insertPage('/produkte/schuhe', ['deleted' => 1]);
+        $live = $this->insertPage('/produkte/schuhe-sale');
+        $this->insertPage('/kontakt');
+
+        $suggestions = $this->suggestionsForTarget('t3://page?uid=' . $deleted);
+
+        self::assertSame([$live], array_column($suggestions, 'uid'));
+    }
+
+    public function testAPageLinkToAHiddenPageDoesNotSuggestTheHiddenPage(): void
+    {
+        $hidden = $this->insertPage('/produkte/schuhe', ['hidden' => 1]);
+        $live = $this->insertPage('/produkte/schuhe-neu');
+
+        $suggestions = $this->suggestionsForTarget('t3://page?uid=' . $hidden);
+
+        self::assertSame([$live], array_column($suggestions, 'uid'));
+    }
+
+    public function testAPageLinkToAPageThatIsGoneForGoodGetsNoSuggestions(): void
+    {
+        $this->insertPage('/produkte/schuhe');
+
+        self::assertSame([], $this->suggestionsForTarget('t3://page?uid=9999'));
+    }
+
+    public function testAPageLinkToAFolderLikeTargetWithoutPathGetsNoSuggestions(): void
+    {
+        $this->insertPage('/produkte/schuhe');
+
+        self::assertSame([], $this->suggestionsForTarget('t3://record?identifier=tt_news&uid=1'));
+    }
 }
