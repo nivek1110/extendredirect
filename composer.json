@@ -65,7 +65,7 @@
         "typo3/cms": {
             "web-dir": ".Build/public",
             "extension-key": "extendredirect",
-            "version": "1.2.0",
+            "version": "1.2.1",
             "Package": {
                 "providesPackages": {}
             }
