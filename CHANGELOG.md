@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A redirect that points to itself (same path on the same host, ignoring a trailing slash; also a page link whose URL is
+  the redirected path) is a loop and is disabled with the reason "The redirect points to itself", in both check modes and
+  without a request. Regex redirects are not affected.
+- Warning for a redirect that hides a published page: its source is the URL of a visible page, so visitors are redirected
+  before they can see it (the core redirects before it resolves the page). It is only a warning, because that can be on
+  purpose: the editor gets a notice when saving the redirect, and `extendredirect:checkredirects` lists it as "Warning"
+  (`runBulkCheck()` returns it under `warnings`). Nothing is disabled. Hidden, deleted and disabled pages and redirects,
+  regex redirects and other sites or languages are not reported.
+
 ### Fixed
 - Redirects to files were disabled by mistake: a target like `/fileadmin/docs/report.pdf` is no page, and the in-process
   frontend request of the `request` mode cannot serve static files, so the check ended with "page not found" although

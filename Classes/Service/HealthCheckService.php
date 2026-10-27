@@ -93,13 +93,13 @@ class HealthCheckService
      * @param int  $maxRuntime stop starting new checks after this many seconds (0 = no limit)
      * @param int  $limit      check at most this many redirects, least recently checked first (0 = no limit)
      *
-     * @return array{checked: int, skipped: int, remaining: int, broken: list<array{uid: int, source: string, message: string, newlyDisabled: bool}>}
+     * @return array{checked: int, skipped: int, remaining: int, broken: list<array{uid: int, source: string, message: string, newlyDisabled: bool}>, warnings: list<array{uid: int, source: string, message: string}>}
      * @throws Exception
      */
     public function runBulkCheck(bool $dryRun = false, int $delayMs = 0, int $maxRuntime = 0, int $limit = 0): array
     {
         $redirects = GeneralUtility::makeInstance(RedirectRepository::class)->findAll();
-        $result = ['checked' => 0, 'skipped' => 0, 'remaining' => 0, 'broken' => []];
+        $result = ['checked' => 0, 'skipped' => 0, 'remaining' => 0, 'broken' => [], 'warnings' => []];
         $startedAt = microtime(true);
 
         $isSkipped = static fn(array $redirect): bool => (int) $redirect['disabled'] === 1
@@ -130,6 +130,14 @@ class HealthCheckService
                     // false: still broken, but it was already disabled before this run
                     // (in a dry run: true = it would be disabled now)
                     'newlyDisabled' => $wasEnabled,
+                ];
+            }
+
+            if (!$check['redirectError'] && ($warning = $this->describeShadowedPage($redirect)) !== null) {
+                $result['warnings'][] = [
+                    'uid' => (int) $redirect['uid'],
+                    'source' => (string) $redirect['source_host'] . (string) $redirect['source_path'],
+                    'message' => $warning,
                 ];
             }
 
@@ -173,6 +181,14 @@ class HealthCheckService
                 $message['message'],
                 $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.adjusted.title'),
                 ContextualFeedbackSeverity::INFO
+            );
+        }
+
+        if (is_array($message) && !$message['redirectError'] && is_array($redirect) && ($warning = $this->describeShadowedPage($redirect)) !== null) {
+            $this->generateFlashMessage(
+                $warning,
+                $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:flashMessage.shadowsPage.title'),
+                ContextualFeedbackSeverity::WARNING
             );
         }
     }
@@ -354,6 +370,11 @@ class HealthCheckService
      */
     protected function checkRedirect(array &$redirect): array
     {
+        // A redirect to its own URL is a loop: certain, so no request is needed to find out.
+        if (!(bool) ($redirect['is_regexp'] ?? false) && $this->redirectsToItself($redirect)) {
+            return ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.redirectsToItself')];
+        }
+
         $existRedirect = GeneralUtility::makeInstance(RedirectRepository::class)
             ->findDuplicatesBySourcePath((string) $redirect['source_path'], (string) $redirect['source_host']);
         if (count($existRedirect) > 1) {
@@ -642,6 +663,85 @@ class HealthCheckService
      * redirect live over HTTP; "database" resolves everything against the
      * pages/sys_redirect tables instead, without firing any request.
      */
+    /**
+     * Whether the target of a (non-regex) redirect is the very URL it redirects: the same path - ignoring a trailing
+     * slash - on the same host. A target with a query string is another URL, so it is not a loop.
+     *
+     * @param array<mixed> $redirect
+     */
+    protected function redirectsToItself(array $redirect): bool
+    {
+        $sourcePath = '/' . trim((string) ($redirect['source_path'] ?? ''), '/');
+        $sourceHost = (string) ($redirect['source_host'] ?? '*');
+        $target = (string) ($redirect['target'] ?? '');
+
+        if (str_starts_with($target, 't3://')) {
+            try {
+                $link = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
+            } catch (\Throwable) {
+                return false;
+            }
+            if (($link['type'] ?? '') !== LinkService::TYPE_PAGE) {
+                return false;
+            }
+            $page = $this->findPageByUid((int) ($link['pageuid'] ?? 0));
+            parse_str((string) parse_url($target, PHP_URL_QUERY), $parameters);
+            $language = $parameters['_language'] ?? $parameters['L'] ?? null;
+            $url = $page === null ? null : $this->buildPageUrl($page, is_numeric($language) ? (int) $language : null);
+            if ($url === null) {
+                return false;
+            }
+            $target = $url;
+        } elseif (parse_url($target, PHP_URL_QUERY) !== null) {
+            return false;
+        }
+
+        $targetPath = '/' . trim((string) parse_url($target, PHP_URL_PATH), '/');
+        $targetHost = parse_url($target, PHP_URL_HOST);
+        if ($targetPath !== $sourcePath) {
+            return false;
+        }
+
+        return !is_string($targetHost)
+            || in_array($sourceHost, ['*', ''], true)
+            || strcasecmp($targetHost, $sourceHost) === 0;
+    }
+
+    /**
+     * The page a redirect hides, as a sentence for a warning, or null. A redirect whose source is the URL of a
+     * published page wins against that page (the core redirects before it resolves the page), so visitors never
+     * see it. That may be on purpose, which is why it is only a warning. Only enabled non-regex redirects count.
+     *
+     * @param array<mixed> $redirect
+     */
+    protected function describeShadowedPage(array $redirect): ?string
+    {
+        if ((bool) ($redirect['is_regexp'] ?? false) || (int) ($redirect['disabled'] ?? 0) === 1 && (int) ($redirect['broken_redirect'] ?? 0) === 0) {
+            return null;
+        }
+
+        $sourceHost = (string) ($redirect['source_host'] ?? '*');
+        $sourcePath = (string) ($redirect['source_path'] ?? '');
+        if (trim($sourcePath, '/') === '' && $sourcePath !== '/') {
+            return null;
+        }
+
+        foreach ($this->findSitesBySourceHost($sourceHost) as $site) {
+            $host = in_array($sourceHost, ['*', ''], true) ? $site->getBase()->getHost() : $sourceHost;
+            [$languageId, $lookupPath] = $this->detectPathLanguage($site, $host, $sourcePath);
+            $page = $this->findPageBySlug($lookupPath, $site, $languageId);
+            if ($page !== null) {
+                return sprintf(
+                    $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.shadowsPage'),
+                    (string) ($page['title'] ?? $page['slug']),
+                    (int) $page['uid']
+                );
+            }
+        }
+
+        return null;
+    }
+
     protected function getCheckMode(): string
     {
         try {
@@ -909,7 +1009,7 @@ class HealthCheckService
             ->add(GeneralUtility::makeInstance(HiddenRestriction::class));
 
         $candidates = $queryBuilder
-            ->select('uid', 'pid', 'slug')
+            ->select('uid', 'pid', 'slug', 'title')
             ->from('pages')
             ->where(
                 $queryBuilder->expr()->eq('slug', $queryBuilder->createNamedParameter($slug, ParameterType::STRING)),

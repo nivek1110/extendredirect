@@ -9,6 +9,9 @@ use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Type\ContextualFeedbackSeverity;
+use TYPO3\CMS\Core\Messaging\FlashMessageService;
+use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -179,5 +182,27 @@ class DataHandlerHookTest extends FunctionalTestCase
         (new DataHandlerHook())->processDatamap_afterDatabaseOperations('new', 'sys_redirect', 'NEW123', [], $dataHandler);
 
         self::assertSame([], $this->redirectRepository->findAll());
+    }
+
+    public function testSavingARedirectThatHidesAPublishedPageWarnsTheEditor(): void
+    {
+        $rootUid = $this->insertRootPageWithSite();
+        $this->insertPage($rootUid, '/shadowed');
+        $this->insertPage($rootUid, '/destination');
+        $uid = $this->insertRedirect(['source_path' => '/shadowed', 'target' => '/old-target']);
+
+        $dataHandler = $this->newDataHandler();
+        $dataHandler->start(['sys_redirect' => [$uid => ['target' => '/destination']]], []);
+        $dataHandler->process_datamap();
+
+        $messages = GeneralUtility::makeInstance(FlashMessageService::class)
+            ->getMessageQueueByIdentifier(FlashMessageQueue::NOTIFICATION_QUEUE)
+            ->getAllMessages();
+        $warnings = array_filter($messages, static fn($message): bool => str_contains($message->getMessage(), 'hides the page'));
+        self::assertCount(1, $warnings, 'the editor is told that the page is no longer reachable');
+        self::assertSame(ContextualFeedbackSeverity::WARNING, array_values($warnings)[0]->getSeverity());
+        $row = $this->redirectRepository->findByUid($uid);
+        self::assertIsArray($row);
+        self::assertSame(0, (int) $row['disabled'], 'only a warning - the redirect stays on');
     }
 }

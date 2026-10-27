@@ -227,9 +227,12 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
     public function testEndlessRedirectLoopIsDisabledAsLoopRisk(): void
     {
-        $uid = $this->insertRedirect('/loop', '/loop');
+        // Two redirects that lead into each other: not a plain self redirect, so only following it finds the loop.
+        $uid = $this->insertRedirect('/loop-a', '/loop-b');
+        $this->insertRedirect('/loop-b', '/loop-a');
         $service = $this->createService([
-            'https://example.com/loop' => $this->redirectTo('https://example.com/loop'),
+            'https://example.com/loop-a' => $this->redirectTo('https://example.com/loop-b'),
+            'https://example.com/loop-b' => $this->redirectTo('https://example.com/loop-a'),
         ]);
 
         $service->runBulkCheck();
@@ -811,5 +814,34 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame(0, (int) $this->redirect($existing)['disabled']);
         self::assertSame(1, (int) $this->redirect($missing)['disabled']);
         self::assertSame([], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testARedirectToItselfIsDisabledWithoutRequestingAnything(): void
+    {
+        $uid = $this->insertRedirect('/loop', '/loop', ['source_host' => 'example.com']);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy(), 'no ten requests to find out what is certain');
+        $log = GeneralUtility::makeInstance(DisableLogRepository::class)->findAll();
+        self::assertStringContainsString('points to itself', (string) $log[0]['reason']);
+    }
+
+    public function testARedirectThatHidesAPageIsAWarningInRequestModeToo(): void
+    {
+        $this->insertPage($this->rootUid, '/produkte');
+        $this->insertPage($this->rootUid, '/kontakt');
+        $uid = $this->insertRedirect('/produkte', '/kontakt', ['source_host' => 'example.com']);
+        $service = $this->createService([
+            'https://example.com/produkte' => $this->redirectTo('https://example.com/kontakt'),
+            'https://example.com/kontakt' => $this->responseWithStatus(200),
+        ]);
+
+        $result = $service->runBulkCheck();
+
+        self::assertSame([$uid], array_column($result['warnings'], 'uid'));
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
     }
 }

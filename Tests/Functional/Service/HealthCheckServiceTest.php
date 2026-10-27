@@ -716,6 +716,124 @@ class HealthCheckServiceTest extends FunctionalTestCase
     }
 
     /**
+     * @return array<string, array{0: string, 1: string, 2: bool}> source path, target, expected: points to itself
+     */
+    public static function selfRedirectProvider(): array
+    {
+        return [
+            'same relative path' => ['/a', '/a', true],
+            'trailing slash only' => ['/a', '/a/', true],
+            'absolute url of the same site' => ['/a', 'https://example.com/a', true],
+            'another path' => ['/a', '/b', false],
+            'same path with a query string' => ['/a', '/a?x=1', false],
+            'same path on another host' => ['/a', 'https://other.example/a', false],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfRedirectProvider')]
+    public function testARedirectThatPointsToItselfIsADisabledLoop(string $sourcePath, string $target, bool $isLoop): void
+    {
+        $this->insertPage('/a');
+        $this->insertPage('/b');
+        $uid = $this->insertRedirect($sourcePath, $target, ['source_host' => 'example.com']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame($isLoop ? 1 : 0, (int) $this->redirect($uid)['disabled'], $sourcePath . ' -> ' . $target);
+        if ($isLoop) {
+            $log = GeneralUtility::makeInstance(DisableLogRepository::class)->findAll();
+            self::assertStringContainsString('points to itself', (string) $log[0]['reason']);
+        }
+    }
+
+    public function testAWildcardRedirectToItsOwnPathAndAPageLinkToItsOwnUrlAreLoops(): void
+    {
+        $page = $this->insertPage('/produkte');
+        $path = $this->insertRedirect('/produkte', '/produkte');
+        $link = $this->insertRedirect('/produkte/', 't3://page?uid=' . $page, ['source_host' => 'example.com']);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($path)['disabled']);
+        self::assertSame(1, (int) $this->redirect($link)['disabled'], 'the page link leads to the very URL that is redirected');
+    }
+
+    public function testARegexRedirectIsNeverAnAutomaticLoop(): void
+    {
+        $this->insertPage('/a');
+        $uid = $this->insertRedirect('#^/a$#', '/a', ['is_regexp' => 1]);
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testARedirectThatHidesAPublishedPageIsReportedAsAWarning(): void
+    {
+        $page = $this->insertPage('/produkte');
+        $uid = $this->insertRedirect('/produkte', '/kontakt-neu-seite', ['source_host' => 'example.com']);
+        $this->insertPage('/kontakt-neu-seite');
+
+        $result = $this->subject->runBulkCheck();
+
+        self::assertSame([$uid], array_column($result['warnings'], 'uid'));
+        self::assertStringContainsString('hides the page', $result['warnings'][0]['message']);
+        self::assertStringContainsString('(uid ' . $page . ')', $result['warnings'][0]['message']);
+        self::assertSame(0, (int) $this->redirect($uid)['disabled'], 'a warning never disables: hiding the page may be what the editor wants');
+    }
+
+    public function testNoWarningWithoutAPageAtTheSourceOrForHiddenOrDeletedPages(): void
+    {
+        $hidden = $this->insertPage('/hidden');
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['hidden' => 1], ['uid' => $hidden]);
+        $deleted = $this->insertPage('/deleted');
+        $this->getConnectionPool()->getConnectionForTable('pages')->update('pages', ['deleted' => 1], ['uid' => $deleted]);
+        $this->insertPage('/target');
+        $this->insertRedirect('/no-page', '/target');
+        $this->insertRedirect('/hidden', '/target');
+        $this->insertRedirect('/deleted', '/target');
+
+        $result = $this->subject->runBulkCheck();
+
+        self::assertSame([], $result['warnings']);
+    }
+
+    public function testNoWarningForARedirectThatIsDisabledByHandBrokenOrARegex(): void
+    {
+        $this->insertPage('/produkte');
+        $this->insertPage('/target');
+        $this->insertRedirect('/produkte', '/target', ['disabled' => 1]);
+        $this->insertRedirect('#^/produkte$#', '/target', ['is_regexp' => 1]);
+
+        self::assertSame([], $this->subject->runBulkCheck()['warnings']);
+
+        $broken = $this->insertRedirect('/produkte', '/does-not-exist', ['source_host' => 'example.com']);
+        $this->insertRedirect('/other', '/target');
+        self::assertSame([], $this->subject->runBulkCheck()['warnings'], 'a broken redirect is disabled and hides nothing');
+        self::assertSame(1, (int) $this->redirect($broken)['disabled']);
+    }
+
+    public function testAWarningHonoursSiteLanguageAndHost(): void
+    {
+        $root = $this->createMultilingualSite();
+        $english = $this->insertOtherPage($root, '/produkte');
+        $german = $this->insertOtherPage($root, '/produkte', 1, $english);
+        $this->insertPage('/target');
+        $this->insertOtherPage($root, '/target'); // the redirects must be healthy on both sites to hide anything
+        $onOtherSite = $this->insertRedirect('/de/produkte', '/target', ['source_host' => 'other.example']);
+        $onMainSite = $this->insertRedirect('/de/produkte', '/target', ['source_host' => 'example.com']);
+        $wildcard = $this->insertRedirect('/produkte', '/target');
+
+        $result = $this->subject->runBulkCheck();
+
+        $uids = array_column($result['warnings'], 'uid');
+        sort($uids);
+        self::assertSame([$onOtherSite, $wildcard], $uids, 'the German page of the other site, and a wildcard that covers it; /de/produkte does not exist on the main site');
+        self::assertGreaterThan(0, $german);
+        self::assertGreaterThan(0, $onMainSite);
+    }
+
+    /**
      * @param list<array{uid: int, source: string, message: string, newlyDisabled: bool}> $broken
      * @return list<array{uid: int, newlyDisabled: bool}>
      */

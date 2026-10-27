@@ -350,6 +350,18 @@
                 <source>Export redirects</source>
                 <target>Redirects exportieren</target>
             </trans-unit>
+            <trans-unit id="healthCheck.redirectsToItself">
+                <source>The redirect points to itself (redirect loop).</source>
+                <target>Die Weiterleitung zeigt auf sich selbst (Endlosschleife).</target>
+            </trans-unit>
+            <trans-unit id="healthCheck.shadowsPage">
+                <source>The redirect hides the page "%s" (uid %d): visitors are redirected before they can see it.</source>
+                <target>Die Weiterleitung verdeckt die Seite "%s" (uid %d): Besucher werden weitergeleitet, bevor sie sie sehen können.</target>
+            </trans-unit>
+            <trans-unit id="flashMessage.shadowsPage.title">
+                <source>Redirect hides a page</source>
+                <target>Weiterleitung verdeckt eine Seite</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

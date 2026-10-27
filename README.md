@@ -94,6 +94,18 @@ and only if it is concrete - a page link or a path that must resolve to a visibl
 target on another host, which is left alone. A redirect whose **target** contains a capture group (`/new/$1`) is not checked at
 all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
 
+### Redirects that loop or hide a page
+
+- A redirect whose target is its own URL - the same path on the same host, ignoring a trailing slash, also as a page link
+  to the page at that URL - is a redirect loop. It is **disabled** like any broken redirect, with the reason "The
+  redirect points to itself", without a request. A target with a query string is another URL and not a loop; regex
+  redirects are not checked for it.
+- A redirect whose source is the URL of a **published page** hides that page: the core redirects before it resolves the
+  page, so visitors never see it. That can be intended (the page stays, traffic moves on), so it is only a **warning**:
+  the editor gets a notice when saving the redirect, and `extendredirect:checkredirects` lists it as "Warning". Nothing
+  is disabled. To fix it, delete or disable the redirect, or unpublish the page. Hidden and deleted pages, disabled and
+  regex redirects, and pages of another site or language than the redirect's are not reported.
+
 ### Redirects to files
 
 A target that is a file is judged by the file, not by a page lookup or a request: a static file below the public path

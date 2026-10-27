@@ -89,6 +89,15 @@ class CheckCommand extends Command
                 ));
             }
         }
+        $warnings = $result['warnings'] ?? [];
+        foreach ($warnings as $warning) {
+            $this->io->writeln(sprintf(
+                'Warning: redirect #%d (%s): %s',
+                $warning['uid'],
+                $warning['source'],
+                $warning['message']
+            ));
+        }
         $this->io->success(sprintf(
             'Checked %d redirects, %d broken (%d %s), %d skipped (disabled by hand).',
             $result['checked'],
@@ -97,6 +106,9 @@ class CheckCommand extends Command
             $dryRun ? 'would be newly disabled' : 'newly disabled',
             $result['skipped']
         ));
+        if ($warnings !== []) {
+            $this->io->note(sprintf('%d %s: enabled redirects that hide a published page. Nothing was disabled.', count($warnings), count($warnings) === 1 ? 'warning' : 'warnings'));
+        }
         if ($result['remaining'] > 0) {
             $this->io->warning(sprintf('Run stopped early (limit or max runtime): %d redirects were not checked.', $result['remaining']));
         }

@@ -125,4 +125,28 @@ class CheckCommandTest extends TestCase
         self::assertStringContainsString('Still broken: redirect #8', $display);
         self::assertStringContainsString('2 broken (1 would be newly disabled)', $display);
     }
+
+    public function testWarningsAreListedAndDoNotChangeTheExitCode(): void
+    {
+        $healthCheckService = $this->createStub(HealthCheckService::class);
+        $healthCheckService->method('runBulkCheck')->willReturn($this->bulkResult([
+            'checked' => 2,
+            'warnings' => [['uid' => 9, 'source' => 'example.com/produkte', 'message' => 'The redirect hides the page "Produkte" (uid 5).']],
+        ]));
+        $tester = new CommandTester(new CheckCommand($healthCheckService));
+
+        self::assertSame(0, $tester->execute([]));
+        self::assertStringContainsString('Warning: redirect #9 (example.com/produkte): The redirect hides the page "Produkte" (uid 5).', $tester->getDisplay());
+        self::assertStringContainsString('1 warning', $tester->getDisplay());
+    }
+
+    public function testAResultWithoutWarningsStillWorks(): void
+    {
+        $healthCheckService = $this->createStub(HealthCheckService::class);
+        $healthCheckService->method('runBulkCheck')->willReturn($this->bulkResult(['checked' => 1]));
+        $tester = new CommandTester(new CheckCommand($healthCheckService));
+
+        self::assertSame(0, $tester->execute([]));
+        self::assertStringNotContainsString('Warning', $tester->getDisplay());
+    }
 }
