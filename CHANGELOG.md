@@ -5,16 +5,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-27
+
 ### Added
 - A redirect that points to itself (same path on the same host, ignoring a trailing slash; also a page link whose URL is
   the redirected path) is a loop and is disabled with the reason "The redirect points to itself", in both check modes and
   without a request. Regex redirects are not affected.
 - Warning for a redirect that hides a published page: its source is the URL of a visible page, so visitors are redirected
   before they can see it (the core redirects before it resolves the page; the page stays in the tree but cannot be reached
-  by its address). It is only a warning, because that can be on
-  purpose: the editor gets a notice when saving the redirect, and `extendredirect:checkredirects` lists it as "Warning"
-  (`runBulkCheck()` returns it under `warnings`). Nothing is disabled. Hidden, deleted and disabled pages and redirects,
-  regex redirects and other sites or languages are not reported.
+  by its address). It is only a warning, because that can be on purpose: the editor gets a notice when saving the
+  redirect, and `extendredirect:checkredirects` lists it as "Warning" (`runBulkCheck()` returns it under `warnings`).
+  Nothing is disabled. Hidden, deleted and disabled pages and redirects, regex redirects and other sites or languages are
+  not reported.
 
 ### Fixed
 - Redirects to files were disabled by mistake: a target like `/fileadmin/docs/report.pdf` is no page, and the in-process
@@ -23,6 +25,14 @@ All notable changes to this project are documented here. The format follows
   file below the public path, or a file link (`t3://file?uid=5`) whose file exists in its storage. A missing file below
   `/fileadmin` (or another local storage) is broken. Redirects an earlier version disabled for this reason are enabled
   again by the next check.
+
+### Upgrade notes
+- No database or configuration changes.
+- Redirects to files that an earlier version disabled by mistake are enabled again by the next check (bulk run, command
+  or Scheduler task).
+- Redirects that point to themselves are now disabled as a loop, so a few redirects may show up in the disable log after
+  the next check. Redirects that hide a page are only reported as a warning in the command output and when saving.
+- `HealthCheckService::runBulkCheck()` returns an additional key `warnings`; the existing keys are unchanged.
 
 ## [1.2.1] - 2026-10-26
 
