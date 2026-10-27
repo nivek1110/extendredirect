@@ -7,6 +7,7 @@ namespace Nivek1110\Extendredirect\Tests\Functional\Service;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
+use Nivek1110\Extendredirect\Tests\Support\CreatesFiles;
 use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -20,6 +21,8 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  */
 class HealthCheckServiceTest extends FunctionalTestCase
 {
+    use CreatesFiles;
+
     protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
@@ -40,6 +43,12 @@ class HealthCheckServiceTest extends FunctionalTestCase
 
         $this->subject = GeneralUtility::makeInstance(HealthCheckService::class);
         $this->redirects = GeneralUtility::makeInstance(RedirectRepository::class);
+    }
+
+    protected function tearDown(): void
+    {
+        $this->removeCreatedPublicFiles();
+        parent::tearDown();
     }
 
     private function insertPage(string $slug, int $hidden = 0): int
@@ -664,6 +673,46 @@ class HealthCheckServiceTest extends FunctionalTestCase
         $this->subject->runBulkCheck();
 
         self::assertSame(1, (int) $this->redirect($first)['disabled']);
+    }
+
+    public function testATargetThatIsAnExistingFileIsHealthyAndKeptAsItIs(): void
+    {
+        $this->createPublicFile('fileadmin/docs/test.pdf');
+        $relative = $this->insertRedirect('/old-a', '/fileadmin/docs/test.pdf');
+        $absolute = $this->insertRedirect('/old-b', 'https://example.com/fileadmin/docs/test.pdf');
+
+        $this->subject->runBulkCheck();
+
+        foreach ([$relative, $absolute] as $uid) {
+            self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+        }
+        self::assertSame('/fileadmin/docs/test.pdf', $this->redirect($relative)['target'], 'a file target is not rewritten');
+    }
+
+    public function testATargetThatIsAMissingFileIsBroken(): void
+    {
+        $uid = $this->insertRedirect('/old', '/fileadmin/docs/gone.pdf');
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testAFileLinkTargetIsCheckedAgainstTheFile(): void
+    {
+        $existing = $this->createFalFile('linked.pdf');
+        $vanished = $this->createFalFile('vanished.pdf');
+        $this->removePublicFile('fileadmin/vanished.pdf');
+        $healthy = $this->insertRedirect('/old-a', 't3://file?uid=' . $existing);
+        $goneFromDisk = $this->insertRedirect('/old-b', 't3://file?uid=' . $vanished);
+        $unknown = $this->insertRedirect('/old-c', 't3://file?uid=99999');
+
+        $this->subject->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($healthy)['disabled']);
+        self::assertSame(1, (int) $this->redirect($goneFromDisk)['disabled']);
+        self::assertSame(1, (int) $this->redirect($unknown)['disabled']);
+        self::assertSame('t3://file?uid=' . $existing, $this->redirect($healthy)['target']);
     }
 
     /**

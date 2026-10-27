@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Redirects to files were disabled by mistake: a target like `/fileadmin/docs/report.pdf` is no page, and the in-process
+  frontend request of the `request` mode cannot serve static files, so the check ended with "page not found" although
+  the file was there (the `database` mode had the same problem). A file target is now judged by the file: a static
+  file below the public path, or a file link (`t3://file?uid=5`) whose file exists in its storage. A missing file below
+  `/fileadmin` (or another local storage) is broken. Redirects an earlier version disabled for this reason are enabled
+  again by the next check.
+
 ## [1.2.1] - 2026-10-26
 
 ### Fixed

@@ -37,6 +37,15 @@ and only if it is concrete - a page link or a path that must resolve to a visibl
 a target on another host, which is left alone. A redirect whose **target** contains a capture group (:php:`/new/$1`) is not
 checked at all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
 
+Redirects to files
+==================
+
+A target that is a file is judged by the file, not by a page lookup or a request: a static file below the public path
+(`/fileadmin/docs/report.pdf`, also as an absolute URL of one of your sites) or a file link (`t3://file?uid=5`) is
+healthy if the file exists, and broken if it is missing - below the URL prefix of a local file storage such as
+`/fileadmin/`, or when the file record is gone or the file is gone from its storage. A target outside the file
+storages that is no existing file is treated as before (a page lookup). Nothing is rewritten.
+
 Several sites and languages
 ===========================
 

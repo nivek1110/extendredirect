@@ -7,6 +7,7 @@ namespace Nivek1110\Extendredirect\Tests\Functional\Service;
 use Nivek1110\Extendredirect\Repository\DisableLogRepository;
 use Nivek1110\Extendredirect\Repository\RedirectRepository;
 use Nivek1110\Extendredirect\Service\HealthCheckService;
+use Nivek1110\Extendredirect\Tests\Support\CreatesFiles;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
@@ -27,6 +28,8 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  */
 class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 {
+    use CreatesFiles;
+
     protected array $coreExtensionsToLoad = ['redirects', 'scheduler'];
     protected array $testExtensionsToLoad = ['nivek1110/extendredirect'];
 
@@ -60,6 +63,7 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
+        $this->removeCreatedPublicFiles();
         foreach (['TYPO3_REQUEST', 'BE_USER'] as $key) {
             if (array_key_exists($key, $this->originalGlobals)) {
                 $GLOBALS[$key] = $this->originalGlobals[$key];
@@ -737,5 +741,75 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
         self::assertSame(0, (int) $this->redirect($dynamic)['disabled'], 'a target with $1 cannot be verified: skipped');
         self::assertSame(1, (int) $this->redirect($concreteBroken)['disabled'], 'a concrete target of a regex redirect can');
         self::assertCount(0, $this->requestedUrls, 'the source is a pattern: never requested');
+    }
+
+    public function testAFollowedRedirectToAnExistingFileIsHealthyWithoutRequestingTheFile(): void
+    {
+        $this->createPublicFile('fileadmin/docs/test.pdf');
+        $uid = $this->insertRedirect('/pdf', '/fileadmin/docs/test.pdf');
+        // The in-process frontend request cannot serve static files, so the file must never be requested.
+        $service = $this->createService(['https://example.com/pdf' => $this->redirectTo('https://example.com/fileadmin/docs/test.pdf')]);
+
+        $service->runBulkCheck();
+
+        $row = $this->redirect($uid);
+        self::assertSame(0, (int) $row['disabled']);
+        self::assertSame('/fileadmin/docs/test.pdf', $row['target']);
+        self::assertSame(['https://example.com/pdf'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testAFollowedRedirectToAMissingFileIsBroken(): void
+    {
+        $uid = $this->insertRedirect('/pdf', '/fileadmin/docs/gone.pdf');
+        $service = $this->createService(['https://example.com/pdf' => $this->redirectTo('https://example.com/fileadmin/docs/gone.pdf')]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(1, (int) $this->redirect($uid)['disabled']);
+        self::assertSame(['https://example.com/pdf'], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testADisabledRedirectToAFileIsJudgedByTheFile(): void
+    {
+        $this->createPublicFile('fileadmin/docs/test.pdf');
+        $existing = $this->insertRedirect('/a', '/fileadmin/docs/test.pdf', ['disabled' => 1, 'broken_redirect' => 1]);
+        $missing = $this->insertRedirect('/b', '/fileadmin/docs/gone.pdf', ['disabled' => 1, 'broken_redirect' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($existing)['disabled'], 'the file is back: healed');
+        self::assertSame(1, (int) $this->redirect($missing)['disabled']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy());
+    }
+
+    public function testAFileLinkTargetIsJudgedByTheFileInRequestMode(): void
+    {
+        $existing = $this->createFalFile('linked.pdf');
+        $disabledHealthy = $this->insertRedirect('/a', 't3://file?uid=' . $existing, ['disabled' => 1, 'broken_redirect' => 1]);
+        $disabledUnknown = $this->insertRedirect('/b', 't3://file?uid=99999', ['disabled' => 1, 'broken_redirect' => 1]);
+        $enabled = $this->insertRedirect('/c', 't3://file?uid=' . $existing);
+        $service = $this->createService(['https://example.com/c' => $this->redirectTo('https://example.com/fileadmin/linked.pdf')]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($disabledHealthy)['disabled']);
+        self::assertSame(1, (int) $this->redirect($disabledUnknown)['disabled']);
+        self::assertSame(0, (int) $this->redirect($enabled)['disabled']);
+        self::assertSame('t3://file?uid=' . $existing, $this->redirect($enabled)['target']);
+    }
+
+    public function testARegexRedirectWithAConcreteFileTargetIsJudgedByTheFile(): void
+    {
+        $this->createPublicFile('fileadmin/docs/test.pdf');
+        $existing = $this->insertRedirect('#^/a$#', '/fileadmin/docs/test.pdf', ['is_regexp' => 1]);
+        $missing = $this->insertRedirect('#^/b$#', '/fileadmin/docs/gone.pdf', ['is_regexp' => 1]);
+        $service = $this->createService([]);
+
+        $service->runBulkCheck();
+
+        self::assertSame(0, (int) $this->redirect($existing)['disabled']);
+        self::assertSame(1, (int) $this->redirect($missing)['disabled']);
+        self::assertSame([], $this->requestedUrls->getArrayCopy());
     }
 }

@@ -39,6 +39,9 @@ class HealthCheckService
      */
     private const TARGET_EXTERNAL = 'external';
 
+    /** The target is a file that exists: nothing to rewrite, nothing to request. */
+    private const TARGET_FILE = 'file';
+
     private const MAX_CHAIN_HOPS = 10;
 
     /**
@@ -390,6 +393,11 @@ class HealthCheckService
     {
         $target = (string) ($redirect['target'] ?? '');
 
+        $fileLinkStatus = $this->staticFiles()->statusOfFileLink($target);
+        if ($fileLinkStatus !== null) {
+            return $this->fileResult($fileLinkStatus);
+        }
+
         if (str_starts_with($target, 't3://')) {
             try {
                 $link = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
@@ -421,13 +429,33 @@ class HealthCheckService
                 return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
             }
 
+            $fileStatus = $this->staticFiles()->statusOfPath($target);
+            if ($fileStatus !== null) {
+                return $this->fileResult($fileStatus);
+            }
+
             // An absolute URL of a known site is requested there, not on every site of a wildcard host.
             return $this->checkSingleUrl(str_starts_with($target, '//') ? $this->resolveAbsoluteLocation($target) : $target, $redirect);
+        }
+
+        $fileStatus = $this->staticFiles()->statusOfPath($target);
+        if ($fileStatus !== null) {
+            return $this->fileResult($fileStatus);
         }
 
         $path = (string) parse_url($target, PHP_URL_PATH);
 
         return $this->checkSourceUrls($redirect, '/' . ltrim($path, '/'));
+    }
+
+    /**
+     * @return array{redirectError: bool, redirectCount: int|string, message: string}
+     */
+    protected function fileResult(int $status): array
+    {
+        return $status === 200
+            ? ['redirectError' => false, 'redirectCount' => 0, 'message' => '']
+            : ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
     }
 
     /**
@@ -584,7 +612,7 @@ class HealthCheckService
         // The same site- and language-aware lookup as in "database" mode, but no chain following: a regex source
         // is a pattern, so there is no concrete URL to request.
         $resolution = $this->resolveTargetPage($target, (string) ($redirect['source_host'] ?? '*'));
-        if ($resolution === self::TARGET_EXTERNAL || (is_array($resolution) && str_starts_with($target, 't3://'))) {
+        if ($resolution === self::TARGET_EXTERNAL || $resolution === self::TARGET_FILE || (is_array($resolution) && str_starts_with($target, 't3://'))) {
             return ['redirectError' => false, 'redirectCount' => 0, 'message' => ''];
         }
         if (!is_array($resolution)) {
@@ -659,8 +687,8 @@ class HealthCheckService
 
             $resolution = $this->resolveTargetPage($target, $sourceHost);
             if (!is_array($resolution)) {
-                // Either self::TARGET_EXTERNAL (unverifiable, leave alone) or null (not found).
-                return $resolution === self::TARGET_EXTERNAL
+                // self::TARGET_EXTERNAL (unverifiable, leave alone), self::TARGET_FILE (the file is there) or null (not found).
+                return $resolution === self::TARGET_EXTERNAL || $resolution === self::TARGET_FILE
                     ? ['redirectError' => false, 'redirectCount' => $hops, 'message' => '']
                     : ['redirectError' => true, 'redirectCount' => '-', 'message' => $GLOBALS['LANG']->sL('LLL:EXT:extendredirect/Resources/Private/Language/locallang.xlf:healthCheck.pageNotFound')];
             }
@@ -706,6 +734,12 @@ class HealthCheckService
      */
     protected function resolveTargetPage(string $target, string $sourceHost): array|string|null
     {
+        // A file link is judged by the file, not by a page lookup.
+        $fileStatus = $this->staticFiles()->statusOfFileLink($target);
+        if ($fileStatus !== null) {
+            return $fileStatus === 200 ? self::TARGET_FILE : null;
+        }
+
         try {
             $linkDetails = GeneralUtility::makeInstance(LinkService::class)->resolve($target);
         } catch (\Exception) {
@@ -743,6 +777,12 @@ class HealthCheckService
             }
         } elseif ($sourceHost !== '*') {
             $expectedSite = $this->findSiteByHost($sourceHost);
+        }
+
+        // A static file (/fileadmin/...) is no page and cannot be served by the frontend request: judge the file.
+        $pathStatus = $this->staticFiles()->statusOfPath($path);
+        if ($pathStatus !== null) {
+            return $pathStatus === 200 ? self::TARGET_FILE : null;
         }
 
         // The language is part of the URL: a prefix such as /de/, or a language with a domain of its own.
@@ -963,6 +1003,28 @@ class HealthCheckService
     }
 
     /**
+     * Follows a Location header. A static file on one of our own domains is not requested - the in-process
+     * frontend request cannot serve it - but judged by the file: 200 if it is there, 404 if not.
+     */
+    protected function followLocation(string $location): ResponseInterface
+    {
+        $host = parse_url($location, PHP_URL_HOST);
+        if (!is_string($host) || $this->findSiteByHost($host) !== null) {
+            $status = $this->staticFiles()->statusOfPath($location);
+            if ($status !== null) {
+                return new Response('php://temp', $status);
+            }
+        }
+
+        return $this->redirectFollower($location);
+    }
+
+    protected function staticFiles(): StaticFileService
+    {
+        return GeneralUtility::makeInstance(StaticFileService::class);
+    }
+
+    /**
      * Check a single resolved URL
      *
      * @param string        $url
@@ -990,7 +1052,7 @@ class HealthCheckService
             $redirectCount++;
             $finalLocation = $newLocation;
 
-            $response = $this->redirectFollower($newLocation);
+            $response = $this->followLocation($newLocation);
         }
 
         $statusCode = $response->getStatusCode();
