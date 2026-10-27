@@ -94,17 +94,40 @@ and only if it is concrete - a page link or a path that must resolve to a visibl
 target on another host, which is left alone. A redirect whose **target** contains a capture group (`/new/$1`) is not checked at
 all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
 
-### Redirects that loop or hide a page
+### A redirect that points to itself
 
-- A redirect whose target is its own URL - the same path on the same host, ignoring a trailing slash, also as a page link
-  to the page at that URL - is a redirect loop. It is **disabled** like any broken redirect, with the reason "The
-  redirect points to itself", without a request. A target with a query string is another URL and not a loop; regex
-  redirects are not checked for it.
-- A redirect whose source is the URL of a **published page** hides that page: the core redirects before it resolves the
-  page, so visitors never see it. That can be intended (the page stays, traffic moves on), so it is only a **warning**:
-  the editor gets a notice when saving the redirect, and `extendredirect:checkredirects` lists it as "Warning". Nothing
-  is disabled. To fix it, delete or disable the redirect, or unpublish the page. Hidden and deleted pages, disabled and
-  regex redirects, and pages of another site or language than the redirect's are not reported.
+If the target of a redirect is the very URL it redirects, visitors would be sent in a circle. That is a redirect loop,
+and the extension **disables** such a redirect like any broken one, with the reason "The redirect points to itself" -
+without sending a request first. It counts as the same URL if the path is the same on the same host, ignoring a
+trailing slash (`/a` → `/a/`), and also if the target is a page link to the page that lives at that URL. A target with a
+query string (`/a?x=1`) is another URL and no loop. Regex redirects are not checked for this.
+
+### A redirect that hides a page
+
+**What it means.** TYPO3 handles redirects *before* it looks for a page. If the source of a redirect is the URL of a
+page that exists and is published, the redirect wins: whoever opens that URL is sent on and never sees the page. The page
+is still there in the page tree, but it can no longer be reached by its address.
+
+**Example.** The page *Products* has the URL `/products`. Someone creates a redirect with the source `/products` and the
+target `/contact`. From then on `/products` leads to the contact page, although the page *Products* is published.
+
+**Why it is only a warning.** Sometimes this is exactly what you want: the page stays in the tree for now, but all
+traffic is meant to move on. Often it is a mistake, for example a redirect created for a URL that still has a page. The
+extension cannot tell which, so it **never disables** such a redirect. It only tells you:
+
+- When an editor **saves** the redirect, a notice in the backend says which page it hides.
+- `extendredirect:checkredirects` lists every such redirect as `Warning: redirect #12 (example.com/products): The redirect
+  hides the page "Products" (uid 5) ...` and ends with a note with the number of warnings. The exit code is not
+  changed, so a Scheduler task does not fail because of it.
+
+**How to fix it.** If it is a mistake, delete or disable the redirect. If you want the redirect, unpublish or delete the
+page, otherwise the warning stays.
+
+**What is looked at.** Only enabled, non-regex redirects whose check is healthy - a redirect that gets disabled hides
+nothing. The source must be the URL of a *visible* page of the redirect's site and language: a language prefix such as
+`/de/products` selects the German page, and a redirect for all domains (`*`) is reported if the page exists on any site.
+Hidden and deleted pages are not reported, nor are pages of another site or language than the one the redirect applies
+to.
 
 ### Redirects to files
 
