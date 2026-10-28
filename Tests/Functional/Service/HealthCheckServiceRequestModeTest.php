@@ -17,6 +17,7 @@ use TYPO3\CMS\Core\Configuration\SiteWriter;
 use TYPO3\CMS\Core\Http\Response;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -843,5 +844,55 @@ class HealthCheckServiceRequestModeTest extends FunctionalTestCase
 
         self::assertSame([$uid], array_column($result['warnings'], 'uid'));
         self::assertSame(0, (int) $this->redirect($uid)['disabled']);
+    }
+
+    public function testARedirectToAnotherHostIsLeftAloneInRequestMode(): void
+    {
+        $uid = $this->insertRedirect('/ext', 'https://elsewhere.example/page');
+        $protocolRelative = $this->insertRedirect('/ext2', '//elsewhere.example/page');
+        // Nothing is canned for the other host: requesting it would end in a 404 and a disabled redirect.
+        $service = $this->createService([
+            'https://example.com/ext' => $this->redirectTo('https://elsewhere.example/page'),
+            'https://example.com/ext2' => $this->redirectTo('//elsewhere.example/page'),
+        ]);
+
+        $service->runBulkCheck();
+
+        foreach ([$uid, $protocolRelative] as $redirectUid) {
+            self::assertSame(0, (int) $this->redirect($redirectUid)['disabled'], 'a target on another host cannot be checked and is left alone');
+        }
+        self::assertSame('https://elsewhere.example/page', $this->redirect($uid)['target'], 'and not rewritten');
+        self::assertSame(['https://example.com/ext', 'https://example.com/ext2'], $this->requestedUrls->getArrayCopy(), 'the other host is never requested');
+    }
+
+    public function testSubRequestLeavesTheBackendPageRendererAlone(): void
+    {
+        // The frontend rendering resets the shared PageRenderer, which would strip the backend module of its CSS
+        // when the same request renders a page afterwards (the import renders after checking the imported rows).
+        $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
+        $pageRenderer->setTitle('Backend module');
+        $property = new \ReflectionProperty(PageRenderer::class, 'cssFiles');
+        $property->setValue($pageRenderer, ['backend.css' => ['file' => 'backend.css']]);
+        $this->insertRedirect('/old', '/gone');
+
+        $service = new class (
+            GeneralUtility::makeInstance(ExtensionConfiguration::class),
+            GeneralUtility::makeInstance(SiteFinder::class)
+        ) extends HealthCheckService {
+            protected function dispatchSubRequest(string $location): ResponseInterface
+            {
+                $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
+                $pageRenderer->setTitle('Frontend page');
+                (new \ReflectionProperty(PageRenderer::class, 'cssFiles'))->setValue($pageRenderer, []);
+
+                return new Response('php://temp', 404);
+            }
+        };
+
+        $service->runBulkCheck();
+
+        self::assertSame($pageRenderer, GeneralUtility::makeInstance(PageRenderer::class), 'the very same instance: the module template holds it');
+        self::assertSame('Backend module', $pageRenderer->getTitle());
+        self::assertSame(['backend.css' => ['file' => 'backend.css']], $property->getValue($pageRenderer));
     }
 }

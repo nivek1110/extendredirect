@@ -16,6 +16,13 @@ All notable changes to this project are documented here. The format follows
 - `RedirectCsvImportService::importFromCsvFile()` takes the two options (`$overwrite`, `$dryRun`) and returns the
   additional keys `updated`, `unchanged`, `dryRun`, `rows` and `rowsTruncated`; the existing keys are unchanged.
 
+### Fixed
+- `request` mode: a redirect whose target is on another host (for example `https://example.org/page`) was disabled with
+  "The page was not found!", because the in-process check requested the foreign URL as if it were one of our sites. Such
+  targets are now left alone, as in `database` mode.
+- A backend page rendered after a `request` mode check (the CSV import result, for example) lost all its stylesheets:
+  the frontend sub-request reset the shared page renderer. Its state is now restored after each check.
+
 ### Changed
 - Documentation: the `request` check mode was described as "over HTTP" and as needing a "reachable" site. It runs in the
   same PHP process and uses no network, so Basic Auth, IP restrictions, a firewall or a CDN in front of the site do not

@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\LinkHandling\PageLinkHandler;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
+use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -287,8 +288,12 @@ class HealthCheckService
         //   backend middleware wrapping the editor's save looks at exactly that aspect when it
         //   builds the response and, finding no user, deletes the session cookie - so without
         //   restoring it the editor is logged out right after saving a redirect.
+        // - the frontend rendering resets the shared PageRenderer (CSS, JavaScript, title), so a backend page rendered
+        //   after the check - the import does that - would lose all its stylesheets.
         $backendUser = $GLOBALS['BE_USER'] ?? null;
         $originalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
+        $pageRendererState = clone $pageRenderer;
         $context = GeneralUtility::makeInstance(Context::class);
         $aspects = [];
         foreach (self::RESTORED_CONTEXT_ASPECTS as $name) {
@@ -311,7 +316,25 @@ class HealthCheckService
             foreach ($aspects as $name => $aspect) {
                 $context->setAspect($name, $aspect);
             }
+            $this->restoreState($pageRenderer, $pageRendererState);
         }
+    }
+
+    /**
+     * Puts the state of $snapshot (a clone taken earlier) back into $object, keeping the instance itself: others
+     * - the module template - hold a reference to it, so replacing the singleton would not help.
+     */
+    private function restoreState(object $object, object $snapshot): void
+    {
+        (function (object $snapshot): void {
+            foreach (get_object_vars($snapshot) as $name => $value) {
+                try {
+                    $this->$name = $value;
+                } catch (\Error) {
+                    // a readonly property cannot be set again - and was not changed either
+                }
+            }
+        })->call($object, $snapshot);
     }
 
     /**
@@ -1104,16 +1127,22 @@ class HealthCheckService
 
     /**
      * Follows a Location header. A static file on one of our own domains is not requested - the in-process
-     * frontend request cannot serve it - but judged by the file: 200 if it is there, 404 if not.
+     * frontend request cannot serve it - but judged by the file: 200 if it is there, 404 if not. A location on
+     * another host is not requested either and counts as fine.
      */
     protected function followLocation(string $location): ResponseInterface
     {
         $host = parse_url($location, PHP_URL_HOST);
-        if (!is_string($host) || $this->findSiteByHost($host) !== null) {
-            $status = $this->staticFiles()->statusOfPath($location);
-            if ($status !== null) {
-                return new Response('php://temp', $status);
-            }
+        if (is_string($host) && $this->findSiteByHost($host) === null) {
+            // Another host cannot be judged from inside TYPO3 (the in-process request only knows our sites), and
+            // requesting it would end in a 404 and a disabled redirect that works: leave it alone, as "database"
+            // mode does.
+            return new Response('php://temp', 200);
+        }
+
+        $status = $this->staticFiles()->statusOfPath($location);
+        if ($status !== null) {
+            return new Response('php://temp', $status);
         }
 
         return $this->redirectFollower($location);
