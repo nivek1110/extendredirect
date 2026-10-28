@@ -6,6 +6,8 @@ namespace Nivek1110\Extendredirect\Repository;
 
 use Psr\Http\Message\ServerRequestInterface;
 use Doctrine\DBAL\ParameterType;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Extbase\Utility\DebuggerUtility;
@@ -106,6 +108,33 @@ class RedirectRepository extends \TYPO3\CMS\Redirects\Repository\RedirectReposit
             ->set('disabled', 1)
             ->set('broken_redirect', 1)
             ->executeStatement();
+    }
+
+    /**
+     * The redirect with exactly this source host and source path (not the looser match of
+     * existsBySourcePath()), disabled ones included, deleted ones not.
+     *
+     * @return array<string, mixed>|null
+     * @throws \Doctrine\DBAL\Exception
+     */
+    public function findBySource(string $sourceHost, string $sourcePath): ?array
+    {
+        $queryBuilder = $this->getQueryBuilder();
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+
+        $row = $queryBuilder
+            ->select('*')
+            ->from('sys_redirect')
+            ->where(
+                $queryBuilder->expr()->eq('source_host', $queryBuilder->createNamedParameter($sourceHost)),
+                $queryBuilder->expr()->eq('source_path', $queryBuilder->createNamedParameter($sourcePath))
+            )
+            ->orderBy('uid')
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return $row === false ? null : $row;
     }
 
     /**

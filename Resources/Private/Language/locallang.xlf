@@ -264,6 +264,66 @@
             <trans-unit id="flashMessage.shadowsPage.title">
                 <source>Redirect hides a page</source>
             </trans-unit>
+            <trans-unit id="import.option.overwrite">
+                <source>Overwrite existing redirects</source>
+            </trans-unit>
+            <trans-unit id="import.option.overwrite.help">
+                <source>A row whose source host and source path exactly match an existing redirect updates it. Empty cells of the optional columns switch that option off; optional columns that are missing from the file stay as they are. Without this option such rows are skipped.</source>
+            </trans-unit>
+            <trans-unit id="import.option.dryRun">
+                <source>Preview only (change nothing)</source>
+            </trans-unit>
+            <trans-unit id="import.option.dryRun.help">
+                <source>Shows what the import would do, row by row, without saving anything.</source>
+            </trans-unit>
+            <trans-unit id="import.result.updated">
+                <source>of %1$s redirects updated</source>
+            </trans-unit>
+            <trans-unit id="import.result.unchanged">
+                <source>of %1$s redirects unchanged</source>
+            </trans-unit>
+            <trans-unit id="import.preview.title">
+                <source>Preview - nothing was changed</source>
+            </trans-unit>
+            <trans-unit id="import.preview.summary">
+                <source>Would import %1$s, update %2$s, leave %3$s unchanged and skip %4$s. Untick "Preview only" and import again to apply it.</source>
+            </trans-unit>
+            <trans-unit id="import.preview.column.line">
+                <source>Line</source>
+            </trans-unit>
+            <trans-unit id="import.preview.column.action">
+                <source>Action</source>
+            </trans-unit>
+            <trans-unit id="import.preview.column.source">
+                <source>Source</source>
+            </trans-unit>
+            <trans-unit id="import.preview.column.changes">
+                <source>Changes</source>
+            </trans-unit>
+            <trans-unit id="import.preview.action.imported">
+                <source>would be imported</source>
+            </trans-unit>
+            <trans-unit id="import.preview.action.updated">
+                <source>would be updated</source>
+            </trans-unit>
+            <trans-unit id="import.preview.action.unchanged">
+                <source>unchanged</source>
+            </trans-unit>
+            <trans-unit id="import.preview.action.skipped">
+                <source>would be skipped</source>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.exists">
+                <source>a redirect with this source already exists</source>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.unknownHost">
+                <source>unknown source host</source>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.duplicateInFile">
+                <source>the same source is listed earlier in the file</source>
+            </trans-unit>
+            <trans-unit id="import.preview.truncated">
+                <source>Only the first 200 rows are listed; the counts above include all rows.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

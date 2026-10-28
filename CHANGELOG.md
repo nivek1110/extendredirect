@@ -5,6 +5,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- CSV import: the option "Overwrite existing redirects". A row whose source host and source path match an existing
+  redirect exactly now updates it instead of being skipped (looser matches, such as a wildcard row against a host row, are
+  still skipped). Only changed values are written, identical rows are reported as unchanged, an empty cell of an optional
+  column in the file switches that option off, and optional columns missing from the file stay as they are. Together
+  with the export this makes "export, edit in a spreadsheet, import again" work; an unchanged export imports as a no-op.
+- CSV import: the option "Preview only (change nothing)": shows row by row what the import would import, update (old and
+  new value), leave unchanged or skip (with the reason), and the totals, without saving anything.
+- `RedirectCsvImportService::importFromCsvFile()` takes the two options (`$overwrite`, `$dryRun`) and returns the
+  additional keys `updated`, `unchanged`, `dryRun`, `rows` and `rowsTruncated`; the existing keys are unchanged.
+
 ### Changed
 - Documentation: the `request` check mode was described as "over HTTP" and as needing a "reachable" site. It runs in the
   same PHP process and uses no network, so Basic Auth, IP restrictions, a firewall or a CDN in front of the site do not

@@ -64,7 +64,8 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         if (array_key_exists('redirect', $request->getUploadedFiles())) {
             /* @var UploadedFile $file */
             $file = $request->getUploadedFiles()['redirect'];
-            $this->importRedirect($file->getTemporaryFileName(), $view);
+            $options = (array) ($request->getParsedBody() ?? []);
+            $this->importRedirect($file->getTemporaryFileName(), $view, !empty($options['overwrite']), !empty($options['dryRun']));
         }
         return $view->renderResponse('Management/Import');
     }
@@ -136,9 +137,9 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         return new RedirectResponse((string) $uriBuilder->buildUriFromRoute('redirect_disable_log'));
     }
 
-    protected function importRedirect(string $uploadedFile, ModuleTemplate $view): void
+    protected function importRedirect(string $uploadedFile, ModuleTemplate $view, bool $overwrite = false, bool $dryRun = false): void
     {
-        $result = GeneralUtility::makeInstance(RedirectCsvImportService::class)->importFromCsvFile($uploadedFile);
+        $result = GeneralUtility::makeInstance(RedirectCsvImportService::class)->importFromCsvFile($uploadedFile, $overwrite, $dryRun);
 
         foreach ($result['messages'] as $flashMessage) {
             $this->addFlashMessage($flashMessage['message'], $flashMessage['title'], $flashMessage['severity']);
@@ -147,7 +148,14 @@ class ManagementController extends \TYPO3\CMS\Redirects\Controller\ManagementCon
         $view->assignMultiple([
             'counter' => $result['counter'],
             'imported' => $result['imported'],
+            'updated' => $result['updated'],
+            'unchanged' => $result['unchanged'],
             'ignoreCounter' => $result['ignoreCounter'],
+            'dryRun' => $result['dryRun'],
+            'overwrite' => $overwrite,
+            'rows' => $result['rows'],
+            'rowsTruncated' => $result['rowsTruncated'],
+            'hasRows' => $result['counter'] > 0,
         ]);
     }
 

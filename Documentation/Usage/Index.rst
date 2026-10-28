@@ -37,6 +37,27 @@ and only if it is concrete - a page link or a path that must resolve to a visibl
 a target on another host, which is left alone. A redirect whose **target** contains a capture group (:php:`/new/$1`) is not
 checked at all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
 
+Importing again: overwrite and preview
+======================================
+
+By default the CSV import skips every row whose source already exists, so an exported file cannot be edited and
+imported again. Two options on the import form change that:
+
+*   **Overwrite existing redirects.** A row whose **source host and source path exactly match** an existing redirect
+    updates it. Looser matches are still skipped: a row for `example.com` + `/old` does not overwrite a wildcard
+    (`*`) redirect for `/old`, as that would silently narrow it to one host. Only changed values are written, and a
+    row that equals the existing redirect is left alone ("unchanged"). An **empty cell** of an optional column that is
+    in the file switches that option off (an empty `disabled` enables the redirect); optional columns that are
+    **missing from the file** stay as they are. `creation_type` and the page are not set by the file. A changed
+    target is saved like an editor's save: the redirect is enabled and checked right away. If a source is listed
+    twice in the file, the first row wins.
+*   **Preview only (change nothing).** Decides everything as the real import would and shows it row by row -
+    imported, updated (with old and new value of every changed field), unchanged, skipped (with the reason) - and the
+    totals, but saves nothing. Untick it and import the same file again to apply it. The table lists the first 200
+    rows; the totals count all rows.
+
+An export that is imported again with "Overwrite existing redirects" changes nothing: every row is "unchanged".
+
 A redirect that points to itself
 ================================
 

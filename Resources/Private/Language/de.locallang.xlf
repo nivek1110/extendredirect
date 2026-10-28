@@ -362,6 +362,86 @@
                 <source>Redirect hides a page</source>
                 <target>Weiterleitung verdeckt eine Seite</target>
             </trans-unit>
+            <trans-unit id="import.option.overwrite">
+                <source>Overwrite existing redirects</source>
+                <target>Bestehende Redirects überschreiben</target>
+            </trans-unit>
+            <trans-unit id="import.option.overwrite.help">
+                <source>A row whose source host and source path exactly match an existing redirect updates it. Empty cells of the optional columns switch that option off; optional columns that are missing from the file stay as they are. Without this option such rows are skipped.</source>
+                <target>Eine Zeile, deren Quell-Host und Quellpfad genau mit einem bestehenden Redirect übereinstimmen, aktualisiert ihn. Leere Zellen der optionalen Spalten schalten die Option aus; optionale Spalten, die in der Datei fehlen, bleiben unverändert. Ohne diese Option werden solche Zeilen übersprungen.</target>
+            </trans-unit>
+            <trans-unit id="import.option.dryRun">
+                <source>Preview only (change nothing)</source>
+                <target>Nur Vorschau (nichts ändern)</target>
+            </trans-unit>
+            <trans-unit id="import.option.dryRun.help">
+                <source>Shows what the import would do, row by row, without saving anything.</source>
+                <target>Zeigt zeilenweise, was der Import tun würde, ohne etwas zu speichern.</target>
+            </trans-unit>
+            <trans-unit id="import.result.updated">
+                <source>of %1$s redirects updated</source>
+                <target>von %1$s Redirects aktualisiert</target>
+            </trans-unit>
+            <trans-unit id="import.result.unchanged">
+                <source>of %1$s redirects unchanged</source>
+                <target>von %1$s Redirects unverändert</target>
+            </trans-unit>
+            <trans-unit id="import.preview.title">
+                <source>Preview - nothing was changed</source>
+                <target>Vorschau - nichts wurde geändert</target>
+            </trans-unit>
+            <trans-unit id="import.preview.summary">
+                <source>Would import %1$s, update %2$s, leave %3$s unchanged and skip %4$s. Untick "Preview only" and import again to apply it.</source>
+                <target>Würde %1$s importieren, %2$s aktualisieren, %3$s unverändert lassen und %4$s überspringen. Zum Anwenden "Nur Vorschau" abwählen und erneut importieren.</target>
+            </trans-unit>
+            <trans-unit id="import.preview.column.line">
+                <source>Line</source>
+                <target>Zeile</target>
+            </trans-unit>
+            <trans-unit id="import.preview.column.action">
+                <source>Action</source>
+                <target>Aktion</target>
+            </trans-unit>
+            <trans-unit id="import.preview.column.source">
+                <source>Source</source>
+                <target>Quelle</target>
+            </trans-unit>
+            <trans-unit id="import.preview.column.changes">
+                <source>Changes</source>
+                <target>Änderungen</target>
+            </trans-unit>
+            <trans-unit id="import.preview.action.imported">
+                <source>would be imported</source>
+                <target>würde importiert</target>
+            </trans-unit>
+            <trans-unit id="import.preview.action.updated">
+                <source>would be updated</source>
+                <target>würde aktualisiert</target>
+            </trans-unit>
+            <trans-unit id="import.preview.action.unchanged">
+                <source>unchanged</source>
+                <target>unverändert</target>
+            </trans-unit>
+            <trans-unit id="import.preview.action.skipped">
+                <source>would be skipped</source>
+                <target>würde übersprungen</target>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.exists">
+                <source>a redirect with this source already exists</source>
+                <target>ein Redirect mit dieser Quelle existiert bereits</target>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.unknownHost">
+                <source>unknown source host</source>
+                <target>unbekannter Quell-Host</target>
+            </trans-unit>
+            <trans-unit id="import.preview.reason.duplicateInFile">
+                <source>the same source is listed earlier in the file</source>
+                <target>dieselbe Quelle steht weiter oben in der Datei</target>
+            </trans-unit>
+            <trans-unit id="import.preview.truncated">
+                <source>Only the first 200 rows are listed; the counts above include all rows.</source>
+                <target>Nur die ersten 200 Zeilen sind aufgelistet; die Zahlen oben enthalten alle Zeilen.</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

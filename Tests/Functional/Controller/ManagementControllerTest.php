@@ -293,4 +293,67 @@ class ManagementControllerTest extends FunctionalTestCase
         self::assertStringContainsString('Export redirects', $body);
         self::assertStringContainsString('redirect_export', $body);
     }
+
+    /**
+     * @param array<string, string> $body
+     */
+    private function importRequestWithCsv(string $csv, array $body): ServerRequest
+    {
+        $csvPath = $this->instancePath . '/typo3temp/var/tests/controller-import-' . uniqid() . '.csv';
+        @mkdir(dirname($csvPath), 0o777, true);
+        file_put_contents($csvPath, $csv);
+
+        return $this->createBackendRequest([], [
+            'redirect' => new UploadedFile($csvPath, (int) filesize($csvPath), UPLOAD_ERR_OK, 'redirect.csv'),
+        ])->withParsedBody($body);
+    }
+
+    private function siteForImports(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['checkMode'] = 'database';
+        $connection = $this->getConnectionPool()->getConnectionForTable('pages');
+        $connection->insert('pages', ['pid' => 0, 'title' => 'Root', 'slug' => '/', 'is_siteroot' => 1, 'doktype' => 1]);
+        GeneralUtility::makeInstance(SiteWriter::class)
+            ->createNewBasicSite('main', (int) $connection->lastInsertId(), 'https://example.com/');
+    }
+
+    public function testImportActionWithOverwriteUpdatesTheExistingRedirect(): void
+    {
+        $this->siteForImports();
+        $this->getConnectionPool()->getConnectionForTable('sys_redirect')->insert('sys_redirect', [
+            'pid' => 0, 'source_host' => 'example.com', 'source_path' => '/old', 'target' => '/a', 'target_statuscode' => 301,
+        ]);
+        $request = $this->importRequestWithCsv(
+            "source_host;source_path;target;target_statuscode\nexample.com;/old;/b;301\n",
+            ['overwrite' => '1']
+        );
+
+        $body = (string) $this->get(ManagementController::class)->importAction($request)->getBody();
+
+        $rows = GeneralUtility::makeInstance(RedirectRepository::class)->findAll();
+        self::assertCount(1, $rows);
+        self::assertSame('/b', $rows[0]['target']);
+        self::assertStringContainsString('updated', $body);
+    }
+
+    public function testImportActionWithDryRunChangesNothingAndShowsAPreview(): void
+    {
+        $this->siteForImports();
+        $this->getConnectionPool()->getConnectionForTable('sys_redirect')->insert('sys_redirect', [
+            'pid' => 0, 'source_host' => 'example.com', 'source_path' => '/old', 'target' => '/a', 'target_statuscode' => 301,
+        ]);
+        $request = $this->importRequestWithCsv(
+            "source_host;source_path;target;target_statuscode\nexample.com;/old;/b;301\nexample.com;/brand-new;/c;301\n",
+            ['overwrite' => '1', 'dryRun' => '1']
+        );
+
+        $body = (string) $this->get(ManagementController::class)->importAction($request)->getBody();
+
+        $rows = GeneralUtility::makeInstance(RedirectRepository::class)->findAll();
+        self::assertCount(1, $rows, 'nothing was created');
+        self::assertSame('/a', $rows[0]['target'], 'nothing was updated');
+        self::assertStringContainsString('Preview', $body);
+        self::assertStringContainsString('/brand-new', $body);
+        self::assertStringContainsString('/old', $body);
+    }
 }

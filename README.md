@@ -49,7 +49,8 @@ up unnoticed.
   module's toolbar, with built-in validation: unknown source hosts and duplicate source paths are
   rejected/skipped and reported back, and page-resolving targets are converted to canonical page
   links on the way in. An "Export redirects" button downloads all redirects as CSV in the same
-  format, so an export can be edited and imported again.
+  format, so an export can be edited and imported again - with "Overwrite existing redirects" the import updates existing
+  redirects, and "Preview only" shows row by row what it would do without saving anything.
 - **CLI / Scheduler command** — `extendredirect:checkredirects` runs the health check over every
   redirect in bulk, so you can schedule it via TYPO3's Scheduler or cron instead of relying purely on
   the on-edit check.
@@ -93,6 +94,26 @@ A regex source (`is_regexp`) has no concrete URL, so there is nothing to request
 and only if it is concrete - a page link or a path that must resolve to a visible page in its site and language, or a
 target on another host, which is left alone. A redirect whose **target** contains a capture group (`/new/$1`) is not checked at
 all - nothing says whether it is right - and counts as healthy; the pattern itself is not tested either.
+
+### Importing again: overwrite and preview
+
+By default the CSV import skips every row whose source already exists, so an exported file cannot be edited and
+imported again. Two options on the import form change that:
+
+- **Overwrite existing redirects.** A row whose **source host and source path exactly match** an existing redirect
+  updates it. Looser matches are still skipped: a row for `example.com` + `/old` does not overwrite a wildcard (`*`)
+  redirect for `/old`, as that would silently narrow it to one host. Only changed values are written, and a row that
+  equals the existing redirect is left alone ("unchanged"). An **empty cell** of an optional column that is in the file
+  switches that option off (an empty `disabled` enables the redirect); optional columns that are **missing from the
+  file** stay as they are. `creation_type` and the page are not set by the file. A changed target is saved like an
+  editor's save: the redirect is enabled and checked right away. If a source is listed twice in the file, the first row
+  wins.
+- **Preview only (change nothing).** Decides everything as the real import would and shows it row by row - imported,
+  updated (with old and new value of every changed field), unchanged, skipped (with the reason) - and the totals, but
+  saves nothing. Untick it and import the same file again to apply it. The table lists the first 200 rows; the totals
+  count all rows.
+
+An export that is imported again with "Overwrite existing redirects" changes nothing: every row is "unchanged".
 
 ### A redirect that points to itself
 
