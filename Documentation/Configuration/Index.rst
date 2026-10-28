@@ -16,12 +16,16 @@ Extension configuration
     :type: options
     :Default: request
 
-    `request`: follow the redirect live through a frontend sub-request, like a browser.
+    `request`: follow the redirect through TYPO3's frontend in the same PHP process, like a visitor would see it.
     `database`: resolve against the `pages`/`sys_redirect` tables without any request.
 
     ..  note::
-        `request` mode needs a reachable, correctly configured site base URL
-        (Site Configuration > Base). Use `database` mode for local or offline environments.
+        `request` mode runs inside TYPO3, not over the network. The site does not have to be reachable over HTTP from
+        the server, and Basic Auth, IP restrictions, a firewall or a CDN in front of it are not involved and need no
+        configuration. This holds for the Scheduler and the command too: they run the same code and do not call the
+        public URL. It needs a correct site base (Site Configuration > Base), because that is how the extension
+        finds the site of a redirect. Redirects or rewrites defined in the web server configuration (outside TYPO3)
+        are not seen. `database` mode needs neither.
 
 ..  _configuration-notification:
 
@@ -74,6 +78,12 @@ needs `notifyOnDisable` and follows `notifyMode` (one call per run or per redire
     http(s) URL that receives the JSON `POST`. Empty = no webhook. Calls time out after 5 seconds.
     Only administrators can set it, and it is not validated beyond the scheme: do not point it at
     internal services you do not control.
+
+    If the endpoint is behind Basic Auth, put the credentials in the URL (`https://user:password@host/path`): they are
+    sent as an `Authorization` header and masked as `***` in error messages. The URL is saved with the extension
+    configuration, so a password in it ends up in `config/system/settings.php`. To keep it out of there, set it in
+    `config/system/additional.php`, for example from an environment variable:
+    :php:`$GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['notifyWebhookUrl'] = getenv('REDIRECT_WEBHOOK_URL');`
 
 ..  confval:: notifyWebhookFormat
     :name: confval-notifywebhookformat

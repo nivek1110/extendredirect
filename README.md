@@ -19,10 +19,10 @@ up unnoticed.
 
 ## Features
 
-- **Automatic health check** — every redirect's target is verified: followed live over HTTP like a
-  browser would, or resolved purely against the `pages`/`sys_redirect` tables without firing a single
-  request (your choice, see [Configuration](#configuration)). Redirects whose target no longer
-  resolves are disabled automatically.
+- **Automatic health check** — every redirect's target is verified: followed through TYPO3's frontend
+  like a visitor would see it (an in-process request, no network involved), or resolved purely against
+  the `pages`/`sys_redirect` tables (your choice, see [Configuration](#configuration)). Redirects whose
+  target no longer resolves are disabled automatically.
 - **Automatic re-enabling ("healing")** — a redirect the extension disabled itself is checked again
   on every later check. As soon as its target works again (the page is back, the target was
   corrected), the redirect is switched back on and redirects visitors again, without anyone having
@@ -172,7 +172,7 @@ Extension configuration (Admin Tools → Settings → Extension Configuration �
 
 | Setting     | Type    | Description                                                                                                     |
 |-------------|---------|-------------------------------------------------------------------------------------------------------------------|
-| `checkMode` | options | `request` (default): follow the redirect live over HTTP, like a browser. `database`: resolve directly against the `pages`/`sys_redirect` tables without firing any request. |
+| `checkMode` | options | `request` (default): follow the redirect through TYPO3's frontend in the same PHP process, like a visitor would see it. `database`: resolve directly against the `pages`/`sys_redirect` tables without firing any request. |
 
 Notification settings (same place, category *notifications*):
 
@@ -182,8 +182,12 @@ Notification settings (same place, category *notifications*):
 | `notifyRecipients` | string  | Comma or semicolon separated addresses. Invalid ones are ignored; without a valid address nothing is sent. The sender is TYPO3's default mail sender (`$GLOBALS['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress']`). |
 | `notifyMode`       | options | `digest` (default): one mail listing every redirect disabled during one check, command run or page change. `single`: one mail per redirect, sent immediately. |
 | `notifyLanguage`   | options | `en` (default) or `de`. |
-| `notifyWebhookUrl` | string  | Optional http(s) URL that receives a JSON `POST` with the same rhythm as the mail. Empty = no webhook. Calls time out after 5 seconds; failures are logged, never fatal. |
+| `notifyWebhookUrl` | string  | Optional http(s) URL that receives a JSON `POST` with the same rhythm as the mail. Empty = no webhook. Calls time out after 5 seconds; failures are logged, never fatal. If the endpoint is behind Basic Auth, put the credentials in the URL (`https://user:password@host/path`): they are sent as an `Authorization` header and masked as `***` in error messages. |
 | `notifyWebhookFormat` | options | `text` (default): `{"text": "..."}` as understood by Slack, Mattermost and Rocket.Chat incoming webhooks. `json`: `{"event": "redirects_disabled", "site": "...", "count": 1, "redirects": [{"redirect_uid", "source_host", "source_path", "target", "status_code", "reason"}]}`. |
+
+The webhook URL is saved with the extension configuration, so a password in it ends up in `config/system/settings.php`.
+To keep it out of there, set it in `config/system/additional.php`, for example from an environment variable:
+`$GLOBALS['TYPO3_CONF_VARS']['EXTENSIONS']['extendredirect']['notifyWebhookUrl'] = getenv('REDIRECT_WEBHOOK_URL');`
 
 Mail transport and webhook call run **after the response**: under PHP-FPM the editor's request is finished first
 (`fastcgi_finish_request()`), so a slow SMTP server or webhook endpoint never keeps the editor waiting. In the CLI
@@ -213,10 +217,13 @@ Nothing is sent by `--dry-run`, and a failing mail transport is only logged — 
 a check or a page deletion. The Scheduler task or CLI run needs a working mail configuration (`MAIL`) like
 any other TYPO3 mail.
 
-> **`request` mode needs a working site base URL.** The check builds the URL to follow from each
-> site's configured base (Site Configuration → Base). Without a reachable, correctly configured base
-> URL there's nothing to request, and the health check can't verify anything — use `database` mode
-> instead if your site isn't reachable over HTTP (e.g. local/offline environments).
+> **`request` mode runs inside TYPO3, not over the network.** The check renders the page in the same PHP process,
+> so the site does **not** have to be reachable over HTTP from the server, and whatever sits in front of it - Basic
+> Auth, IP restrictions, a firewall, a CDN - is not involved and does not need to be configured. This holds for the
+> Scheduler and the command too: they run the same code and do not call the public URL. What it needs is a
+> correct site base (Site Configuration → Base), because that is how the extension finds the site of a redirect. The
+> flip side: redirects or rewrites that are defined in the *web server* configuration (outside TYPO3) are not seen.
+> `database` mode needs neither.
 
 ## Usage
 

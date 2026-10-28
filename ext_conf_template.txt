@@ -1,4 +1,4 @@
-# cat=basic; type=options[HTTP request=request,Database only (no HTTP request)=database]; label=Redirect check mode: "HTTP request" follows the redirect live over HTTP like a browser would; "Database only" resolves the target directly against the pages/redirects tables without firing any request.
+# cat=basic; type=options[Frontend request (in-process)=request,Database only (no request)=database]; label=Redirect check mode: "Frontend request" follows the redirect through TYPO3's frontend in the same PHP process, like a visitor would see it (no network involved, so Basic Auth or a firewall in front of the site does not matter); "Database only" resolves the target directly against the pages/redirects tables without firing any request.
 checkMode = request
 
 # cat=notifications; type=boolean; label=Notify when a redirect is disabled (mail and/or webhook): off by default. Applies to the health check (on save and via the command) and to the page delete/hide protection.

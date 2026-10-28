@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Documentation: the `request` check mode was described as "over HTTP" and as needing a "reachable" site. It runs in the
+  same PHP process and uses no network, so Basic Auth, IP restrictions, a firewall or a CDN in front of the site do not
+  affect it (also not for the Scheduler, which runs the same code; checked with a Basic Auth in front of the site); the docs and the extension setting now say so, and that redirects defined in the web server configuration
+  are not seen. The webhook documentation explains Basic Auth credentials in the URL (sent as `Authorization` header,
+  masked in error messages) and how to keep them out of `settings.php`.
+
 ## [1.2.2] - 2026-10-27
 
 ### Added
