@@ -292,8 +292,14 @@ class HealthCheckService
         //   after the check - the import does that - would lose all its stylesheets.
         $backendUser = $GLOBALS['BE_USER'] ?? null;
         $originalRequest = $GLOBALS['TYPO3_REQUEST'] ?? null;
-        $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
-        $pageRendererState = clone $pageRenderer;
+        $pageRenderer = null;
+        try {
+            $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
+        } catch (\Throwable) {
+            // TYPO3 13 reads the request when it creates the renderer and insists on an application type; without one
+            // there is no backend page that could lose its stylesheets.
+        }
+        $pageRendererState = $pageRenderer !== null ? clone $pageRenderer : null;
         $context = GeneralUtility::makeInstance(Context::class);
         $aspects = [];
         foreach (self::RESTORED_CONTEXT_ASPECTS as $name) {
@@ -316,7 +322,9 @@ class HealthCheckService
             foreach ($aspects as $name => $aspect) {
                 $context->setAspect($name, $aspect);
             }
-            $this->restoreState($pageRenderer, $pageRendererState);
+            if ($pageRenderer !== null && $pageRendererState !== null) {
+                $this->restoreState($pageRenderer, $pageRendererState);
+            }
         }
     }
 
