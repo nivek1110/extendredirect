@@ -105,6 +105,9 @@ Locked decisions:
   `ReleaseNotesTest` fails if the CHANGELOG lacks a section for the current version or the version files disagree.
   The same workflow has a `ter` job (Tailor `ter:publish`, comment = `release-notes.sh --plain`) that is a no-op until the
   repo secret `TYPO3_API_TOKEN` exists and skips versions already in TER.
+  On a tag push `release.yml` first calls `ci.yml` (`workflow_call`; CI does not run on tags by itself) on the tagged
+  commit and publishes only if it is green; a manual run for an existing tag skips CI. Still tag a commit whose `main`
+  CI is green, so the tag does not fail at that gate.
 - Extension Scanner: `Build/Scripts/extension-scan.php` (also run by `ExtensionScannerTest` in CI) must report no *strong*
   matches. Silence false positives (a method name that only looks like a core one) with a `// @extensionScannerIgnoreLine`
   comment above the line and say why. The demo instances link the whole repo as the extension, so the Install Tool scan
