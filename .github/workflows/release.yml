@@ -3,7 +3,8 @@ name: Release
 # Publishes a GitHub release for a version tag, with the matching CHANGELOG.md section as its text,
 # and - if the repository secret TYPO3_API_TOKEN exists - uploads the version to the TYPO3 Extension
 # Repository (TER) with Tailor. Without the secret the TER job only prints a notice.
-# Tag only after CI is green on main - this workflow does not wait for the CI run.
+# A tag push runs the CI workflow on the tagged commit first; nothing is published unless it is green.
+# A manual run for an existing tag skips CI (old tags may predate the current test setup).
 # For a tag that already exists (e.g. one pushed before this workflow was added), run it manually
 # from the Actions tab and enter the tag.
 
@@ -21,8 +22,16 @@ permissions:
   contents: write # creating a release needs write access
 
 jobs:
+  ci:
+    name: CI
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/ci.yml
+
   release:
     name: GitHub release
+    needs: ci
+    # "skipped" is the manual run, where CI does not run; a failed or cancelled CI stops the release.
+    if: ${{ !cancelled() && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
