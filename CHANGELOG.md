@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.3.0] - 2026-10-28
 
 ### Added
 - CSV import: the option "Overwrite existing redirects". A row whose source host and source path match an existing
@@ -20,8 +20,9 @@ All notable changes to this project are documented here. The format follows
 - `request` mode: a redirect whose target is on another host (for example `https://example.org/page`) was disabled with
   "The page was not found!", because the in-process check requested the foreign URL as if it were one of our sites. Such
   targets are now left alone, as in `database` mode.
-- A backend page rendered after a `request` mode check (the CSV import result, for example) lost all its stylesheets:
-  the frontend sub-request reset the shared page renderer. Its state is now restored after each check.
+- TYPO3 14: a backend page rendered after a `request` mode check that really ran a frontend sub-request (the result of
+  a CSV import that creates or changes redirects, for example) lost all its stylesheets, because the sub-request reset
+  the shared page renderer. Its state is now restored after each check. TYPO3 13.4 was not affected.
 
 ### Changed
 - Documentation: the `request` check mode was described as "over HTTP" and as needing a "reachable" site. It runs in the
